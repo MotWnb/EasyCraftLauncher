@@ -14,6 +14,10 @@ def get_os_bits():
     return 'x64' if platform.machine().endswith('64') else 'x32'
 
 
+def get_os_platforms():
+    return 'x64' if platform.machine().endswith('64') else 'x86'
+
+
 def get_os_name():
     if sys.platform.startswith('win'):
         return 'windows'
@@ -26,9 +30,7 @@ def get_os_name():
         sys.exit(1)
 
 
-def extract_files(library, natives_dir, current_dir, arch):
-    save_path = library["downloads"]["artifact"]["path"]
-    save_path = os.path.join(current_dir, ".minecraft/libraries", save_path)
+def extract_files(save_path, natives_dir, arch):
     with zipfile.ZipFile(save_path, 'r') as jar:
         for file_info in jar.infolist():
             if file_info.filename.startswith('META-INF/') or file_info.filename.endswith('/'):
@@ -47,6 +49,8 @@ def extract_files(library, natives_dir, current_dir, arch):
 
 
 def main():
+    jvm_params = ""
+    cp_list = []
     arch = get_os_bits()
     os_name = get_os_name()
     current_dir = os.getcwd()
@@ -67,10 +71,20 @@ def main():
     natives_dir = os.path.join(versions_dir, version_choice, f"{version_choice}-natives")
     with concurrent.futures.ThreadPoolExecutor() as executor:
         for library in version_json["libraries"]:
+            save_path = str(os.path.join(current_dir, ".minecraft/libraries", library["downloads"]["artifact"]["path"]))
             if "rules" in library:
                 for rule in library["rules"]:
                     if rule["action"] == "allow" and rule["os"]["name"] == os_name:
-                        executor.submit(extract_files, library, natives_dir, current_dir, arch)
+                        cp_list.append(save_path)
+                        executor.submit(extract_files, save_path, natives_dir, arch)
+            else:
+                cp_list.append(save_path)
+    cp_str = cp_list[0]
+    del cp_list[0]
+    for i in cp_list:
+        cp_str = cp_str + ";" + i
+    cp_str = cp_str + ";" + str(os.path.join(versions_dir, version_choice, f"{version_choice}.jar"))
+    cp_str = cp_str.replace("/", "\\")
     # 自动生成离线版UUID并储存到players.json
     username = input("请输入用户名:")
     uid = uuid.uuid4()
@@ -93,3 +107,37 @@ def main():
         json.dump(players_json, f, indent=4)
 
     # 启动游戏
+    version_json_path = os.path.join(minecraft_dir, "versions", version_choice, f"{version_choice}.json")
+    with open(version_json_path, "r") as f:
+        version_json = json.load(f)
+    with open("arguments_jvm.properties", "w+") as f:
+        if get_os_platforms() == version_json["arguments"]["jvm"][3]["rules"][0]["os"]["arch"]:
+            f.write("-Xss1M\n")
+        if get_os_name() == version_json["arguments"]["jvm"][0]["rules"][0]["os"]["name"]:
+            f.write("-XstartOnFirstThread\n")
+        if get_os_name() == version_json["arguments"]["jvm"][1]["rules"][0]["os"]["name"]:
+            f.write("-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump\n")
+        f.write("-XX:+UseG1GC\n")
+        f.write("-XX:-OmitStackTraceInFastThrow\n")
+        for jvm_arguments in version_json["arguments"]["jvm"]:
+            if isinstance(jvm_arguments, str):
+                if '-' in jvm_arguments:
+                    if '-cp' in jvm_arguments:
+                        f.write("-cp=${classpath}\n")
+                    else:
+                        f.write(jvm_arguments + "\n")
+
+    with open("arguments_game.properties", "w+") as f:
+        for game_arguments in version_json["arguments"]["game"]:
+            if isinstance(game_arguments, str):
+                if '-' in game_arguments:
+                    f.write(game_arguments + "\n")
+
+    with open("arguments_jvm.properties", "r") as f:
+        arguments_jvm = f.read()
+    arguments_jvm = arguments_jvm.replace("${natives_directory}", natives_dir)
+    arguments_jvm = arguments_jvm.replace("${launcher_name}", "ECL")
+    arguments_jvm = arguments_jvm.replace("${launcher_version}", "1.0.0-PREVIEW")
+    arguments_jvm = arguments_jvm.replace("${classpath}", cp_str)
+    arguments_jvm = arguments_jvm.replace("\n", " ")
+    print(arguments_jvm)
