@@ -1,14 +1,14 @@
-import concurrent
+import concurrent.futures
 import shutil
 import zipfile
 import os
 import sys
 import json
-import concurrent.futures
 import requests
 import platform
 import uuid
 from requests.adapters import HTTPAdapter
+
 
 def get_os_bits():
     return 'x64' if platform.machine().endswith('64') else 'x32'
@@ -26,18 +26,7 @@ def get_os_name():
         sys.exit(1)
 
 
-def download_file(url_download, save_path_download):
-    response = http.get(url_download, verify=False)
-    save_path_download = os.path.join(current_dir, save_path_download)
-    dir_name = os.path.dirname(save_path_download)
-    if not os.path.exists(dir_name):
-        os.makedirs(dir_name)
-    with open(save_path_download, 'wb') as f:
-        f.write(response.content)
-    print("下载完成 " + save_path_download)
-
-
-def extract_files(library, version_choice, natives_dir):
+def extract_files(library, natives_dir, current_dir, arch):
     save_path = library["downloads"]["artifact"]["path"]
     save_path = os.path.join(current_dir, ".minecraft/libraries", save_path)
     with zipfile.ZipFile(save_path, 'r') as jar:
@@ -57,7 +46,7 @@ def extract_files(library, version_choice, natives_dir):
                 shutil.copyfileobj(source, target)
 
 
-if __name__ == "__main__":
+def main():
     arch = get_os_bits()
     os_name = get_os_name()
     current_dir = os.getcwd()
@@ -70,8 +59,7 @@ if __name__ == "__main__":
     http.mount('https://', adapter)
 
     versions = os.listdir(versions_dir)
-    version_choice = "1.20.6"
-    # version_choice = input(f"请输入需要启动的版本名称: {str(versions)} ")
+    version_choice = input(f"请输入需要启动的版本名称: {str(versions)} ")
     version_json_path = os.path.join(versions_dir, version_choice, f"{version_choice}.json")
     with open(version_json_path, "r") as f:
         version_json = json.load(f)
@@ -82,11 +70,10 @@ if __name__ == "__main__":
             if "rules" in library:
                 for rule in library["rules"]:
                     if rule["action"] == "allow" and rule["os"]["name"] == os_name:
-                        executor.submit(extract_files, library, version_choice, natives_dir)
+                        executor.submit(extract_files, library, natives_dir, current_dir, arch)
     # 自动生成离线版UUID并储存到players.json
-    # username = input("请输入用户名:")
-    username = "Breaker"
-    uuid = uuid.uuid4()
+    username = input("请输入用户名:")
+    uid = uuid.uuid4()
     players_json = {}
     players_file_path = os.path.join(minecraft_dir, "players.json")
 
@@ -97,9 +84,9 @@ if __name__ == "__main__":
 
     # 处理用户名和UUID
     if username in players_json:
-        uuid = players_json[username]["uuid"]
+        uid = players_json[username]["uuid"]
     else:
-        players_json[username] = {"uuid": str(uuid)}
+        players_json[username] = {"uuid": str(uid)}
 
     # 将更新后的数据写回文件
     with open(players_file_path, "w") as f:
