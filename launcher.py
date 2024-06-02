@@ -4,9 +4,10 @@ import os
 import sys
 import json
 import requests
-from requests.adapters import HTTPAdapter
-import concurrent.futures
 import platform
+import uuid
+from requests.adapters import HTTPAdapter
+
 
 
 def get_os_bits():
@@ -82,4 +83,19 @@ if __name__ == "__main__":
     #             for rule in library["rules"]:
     #                 if rule["action"] == "allow" and rule["os"]["name"] == os_name:
     #                     executor.submit(extract_files, library, version_choice, natives_dir)
-    # 自动获取离线版UUID
+    # 自动生成离线版UUID并储存到players.json
+    # username = input("请输入用户名:")
+    username = "Breaker"
+    uuid = uuid.uuid4()
+    with open(os.path.join(minecraft_dir, "players.json"), "w") as f:
+        players_json = json.load(f)
+        if username in players_json:
+            uuid = players_json[username]["id"]
+        else:
+            players_json[username] = {"id": str(uuid), "name": username}
+            json.dump(players_json, f, indent=4)
+        f.close()
+    
+
+
+

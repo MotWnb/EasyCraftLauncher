@@ -29,6 +29,7 @@ def download_file(url_download, save_path_download):
         os.makedirs(dir_name)
     with open(save_path_download, 'wb') as f:
         f.write(response.content)
+        f.close()
     print("下载完成 " + save_path_download)
 
 
@@ -47,6 +48,7 @@ download_file("https://piston-meta.mojang.com/mc/game/version_manifest.json", "v
 # 读取版本清单文件
 with open("version_manifest.json", "r") as f:
     version_manifest = json.load(f)
+    f.close()
 
 # 读取版本列表
 version_list = version_manifest["versions"]
@@ -94,6 +96,7 @@ for version in version_list:
         # 下载资源文件
         with open(asset_name, "r") as f:
             asset_json = json.load(f)
+            f.close()
         with concurrent.futures.ThreadPoolExecutor() as executor:
             for asset in asset_json["objects"]:
                 '''
