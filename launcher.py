@@ -10,7 +10,6 @@ import platform
 import uuid
 from requests.adapters import HTTPAdapter
 
-
 def get_os_bits():
     return 'x64' if platform.machine().endswith('64') else 'x32'
 
