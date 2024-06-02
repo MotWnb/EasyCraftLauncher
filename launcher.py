@@ -111,12 +111,21 @@ def main():
     with open(version_json_path, "r") as f:
         version_json = json.load(f)
     with open("arguments_jvm.properties", "w+") as f:
-        if get_os_platforms() == version_json["arguments"]["jvm"][3]["rules"][0]["os"]["arch"]:
-            f.write("-Xss1M\n")
-        if get_os_name() == version_json["arguments"]["jvm"][0]["rules"][0]["os"]["name"]:
-            f.write("-XstartOnFirstThread\n")
-        if get_os_name() == version_json["arguments"]["jvm"][1]["rules"][0]["os"]["name"]:
-            f.write("-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump\n")
+        for i in range(len(version_json['arguments']['jvm'])):
+            if type(version_json["arguments"]["jvm"][i]) == dict:
+                if "arch" in version_json["arguments"]["jvm"][i]["rules"][0]["os"]:
+                    if get_os_platforms() == version_json["arguments"]["jvm"][i]["rules"][0]["os"]["arch"]:
+                        f.write("-Xss1M\n")
+                    continue
+                if "osx" in version_json["arguments"]["jvm"][i]["rules"][0]["os"]["name"]:
+                    if get_os_name() == version_json["arguments"]["jvm"][i]["rules"][0]["os"]["name"]:
+                        f.write("-XstartOnFirstThread\n")
+                    continue
+                if "windows" in version_json["arguments"]["jvm"][i]["rules"][0]["os"]["name"]:
+                    if get_os_name() == version_json["arguments"]["jvm"][i]["rules"][0]["os"]["name"]:
+                        if version_json["arguments"]["jvm"][i]["value"] == "-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump":
+                            f.write("-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump\n")
+                    continue
         f.write("-XX:+UseG1GC\n")
         f.write("-XX:-OmitStackTraceInFastThrow\n")
         for jvm_arguments in version_json["arguments"]["jvm"]:
