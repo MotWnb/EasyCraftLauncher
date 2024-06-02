@@ -1,13 +1,14 @@
+import concurrent
 import shutil
 import zipfile
 import os
 import sys
 import json
+import concurrent.futures
 import requests
 import platform
 import uuid
 from requests.adapters import HTTPAdapter
-
 
 
 def get_os_bits():
@@ -70,32 +71,39 @@ if __name__ == "__main__":
     http.mount('https://', adapter)
 
     versions = os.listdir(versions_dir)
-    version_choice = "1.20.4"
+    version_choice = "1.20.6"
     # version_choice = input(f"请输入需要启动的版本名称: {str(versions)} ")
     version_json_path = os.path.join(versions_dir, version_choice, f"{version_choice}.json")
     with open(version_json_path, "r") as f:
         version_json = json.load(f)
 
-    # natives_dir = os.path.join(versions_dir, version_choice, f"{version_choice}-natives")
-    # with concurrent.futures.ThreadPoolExecutor() as executor:
-    #     for library in version_json["libraries"]:
-    #         if "rules" in library:
-    #             for rule in library["rules"]:
-    #                 if rule["action"] == "allow" and rule["os"]["name"] == os_name:
-    #                     executor.submit(extract_files, library, version_choice, natives_dir)
+    natives_dir = os.path.join(versions_dir, version_choice, f"{version_choice}-natives")
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        for library in version_json["libraries"]:
+            if "rules" in library:
+                for rule in library["rules"]:
+                    if rule["action"] == "allow" and rule["os"]["name"] == os_name:
+                        executor.submit(extract_files, library, version_choice, natives_dir)
     # 自动生成离线版UUID并储存到players.json
     # username = input("请输入用户名:")
     username = "Breaker"
     uuid = uuid.uuid4()
-    with open(os.path.join(minecraft_dir, "players.json"), "w") as f:
-        players_json = json.load(f)
-        if username in players_json:
-            uuid = players_json[username]["id"]
-        else:
-            players_json[username] = {"id": str(uuid), "name": username}
-            json.dump(players_json, f, indent=4)
-        f.close()
-    
+    players_json = {}
+    players_file_path = os.path.join(minecraft_dir, "players.json")
 
+    # 检查文件是否存在且不为空
+    if os.path.exists(players_file_path) and os.path.getsize(players_file_path) > 0:
+        with open(players_file_path, "r") as f:
+            players_json = json.load(f)
 
+    # 处理用户名和UUID
+    if username in players_json:
+        uuid = players_json[username]["uuid"]
+    else:
+        players_json[username] = {"uuid": str(uuid)}
 
+    # 将更新后的数据写回文件
+    with open(players_file_path, "w") as f:
+        json.dump(players_json, f, indent=4)
+
+    # 启动游戏

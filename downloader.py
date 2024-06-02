@@ -28,7 +28,6 @@ def download_file(url_download, save_path_download):
     with open(save_path_download, 'wb') as f:
         f.write(response.content)
         f.close()
-    print("下载完成 " + save_path_download)
 
 
 # 下载并读取版本清单文件
@@ -92,6 +91,7 @@ for version in version_manifest["versions"]:
         if not os.path.exists(java_install_path):
             print(f"JDK{java_version} 不存在，正在下载...")
             os.makedirs(java_install_path)
+            print(java_version)
             jdk.install(java_version, vendor='Azul', path=java_install_path)
         else:
             print(f"JDK{java_version} 已存在")
