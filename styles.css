@@ -1,0 +1,94 @@
+/* 保留原有的样式 */
+body {
+    font-family: Arial, sans-serif;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+header {
+    background-color: #333;
+    color: white;
+    padding: 1rem;
+    text-align: center;
+}
+
+main {
+    flex: 1;
+    padding: 1rem;
+}
+
+section {
+    margin-bottom: 2rem;
+}
+
+.download-button {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: #007BFF;
+    color: white;
+    text-decoration: none;
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
+    margin-top: 1rem;
+}
+
+.download-button:hover {
+    background-color: #0056b3;
+}
+
+footer {
+    background-color: #333;
+    color: white;
+    text-align: center;
+    padding: 1rem;
+}
+
+.icon {
+    width: 24px;
+    height: 24px;
+    vertical-align: middle;
+    margin-left: 0.5rem;
+}
+
+/* 新增的鼠标悬停效果 */
+.team-link {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: transparent;
+    color: inherit;
+    text-decoration: none;
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
+    margin-top: 1rem;
+    overflow: hidden; /* 确保内容不会超出框 */
+}
+
+.team-link:hover {
+    background-color: #007BFF;
+    color: white;
+}
+
+.team-link:hover img {
+    border-radius: 5px; /* 鼠标悬停时应用圆角边框 */
+    transform: scale(1.1); /* 鼠标悬停时图片放大 */
+    transition: transform 0.3s ease; /* 图片放大的动画效果 */
+}
+
+.team-link img {
+    display: block;
+    margin: 0 auto; /* 图片居中 */
+}
+
+/* 添加动画关键帧 */
+@keyframes scaleUp {
+    from {
+        transform: scale(1);
+    }
+    to {
+        transform: scale(1.1);
+    }
+}
