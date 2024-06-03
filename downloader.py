@@ -85,7 +85,7 @@ def download_minecraft_version():
                     executor.submit(download_file, url, save_path)
 
             # 下载JDK
-            java_version = version_json["javaVersion"]["majorVersion"]
+            java_version = str(version_json["javaVersion"]["majorVersion"])
             java_install_path = os.path.join(current_dir, "java", f"jdk{java_version}")
             if not os.path.exists(java_install_path):
                 print(f"JDK{java_version} 不存在，正在下载...")
