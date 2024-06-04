@@ -49,6 +49,7 @@ def extract_files(save_path, natives_dir, arch):
 
 
 def main():
+    global username_arguments_game, version_arguments_game, game_dir_arguments_game, index_arguments_game, assets_dir_arguments_game, uuid_arguments_game, clientid_arguments_game, access_token_arguments_game, user_type_arguments_game, version_type_arguments_game
     jvm_params = ""
     cp_list = []
     arch = get_os_bits()
@@ -56,6 +57,7 @@ def main():
     current_dir = os.getcwd()
     minecraft_dir = os.path.join(current_dir, ".minecraft")
     versions_dir = os.path.join(minecraft_dir, "versions")
+    assets_dir = os.path.join(minecraft_dir, "assets")
 
     adapter = HTTPAdapter(max_retries=5, pool_block=True)
     http = requests.Session()
@@ -150,3 +152,29 @@ def main():
     arguments_jvm = arguments_jvm.replace("${classpath}", cp_str)
     arguments_jvm = arguments_jvm.replace("\n", " ")
     print(arguments_jvm)
+
+    with open("arguments_game.properties", "r") as f:
+        arguments_game_list = f.readlines()
+    for arguments_game in arguments_game_list:
+        if arguments_game == "--username\n":
+            username_arguments_game = "--username " + username + " "
+        if arguments_game == "--version\n":
+            version_arguments_game = "--version " + version_choice + " "
+        if arguments_game == "--gameDir\n":
+            game_dir_arguments_game = "--gameDir " + minecraft_dir + "\\" + version_choice + " "
+        if arguments_game == "--assetsDir\n":
+            assets_dir_arguments_game = "--assetsDir " + assets_dir + " "
+        if arguments_game == "--assetIndex\n":
+            index_arguments_game = "--assetIndex " + version_choice + " "
+        if arguments_game == "--uuid\n":
+            uuid_arguments_game = "--uuid " + uid.replace("-", "") + " "
+        if arguments_game == "--clientId\n":
+            clientid_arguments_game = "--clientId " + "114514" + " "
+        if arguments_game == "--accessToken\n":
+            access_token_arguments_game = "--accessToken " + uid.replace("-", "") + " "
+        if arguments_game == "--userType\n":
+            user_type_arguments_game = "--userType msa" + " "
+        if arguments_game == "--versionType\n":
+            version_type_arguments_game = "--versionType ECL" + " "
+    argument_game = username_arguments_game + version_arguments_game + game_dir_arguments_game + assets_dir_arguments_game + index_arguments_game + uuid_arguments_game + clientid_arguments_game + access_token_arguments_game + user_type_arguments_game + version_type_arguments_game
+    arguments = arguments_jvm + argument_game
