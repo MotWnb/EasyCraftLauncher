@@ -90,7 +90,6 @@ def download_minecraft_version():
             if not os.path.exists(java_install_path):
                 print(f"JDK{java_version} 不存在，正在下载...")
                 os.makedirs(java_install_path)
-                print(java_version)
                 jdk.install(java_version, vendor='Azul', path=java_install_path)
             else:
                 print(f"JDK{java_version} 已存在")
