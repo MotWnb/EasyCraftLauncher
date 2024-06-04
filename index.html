@@ -3,32 +3,86 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EasyCraftLauncher</title>
-    <link rel="stylesheet" href="styles.css">
+    <title>Easy Craft Launcher</title>
+    <style>
+        body, html {
+            height: 100%;
+            margin: 0;
+        }
+        body {
+            background-image: url('images/background.png');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            color: lightgreen;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            animation: backgroundFadeIn 1s ease-out;
+            backdrop-filter: blur(10px); /* 添加毛玻璃效果 */
+        }
+        @keyframes backgroundFadeIn {
+            from { background-position: 0 200%; }
+            to { background-position: 0 50%; }
+        }
+        .title {
+            font-size: 48px;
+            margin-bottom: 20px;
+            opacity: 0;
+            animation: titleFlyIn 1s ease-out forwards;
+        }
+        @keyframes titleFlyIn {
+            from { transform: translateX(-100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .subtitle {
+            font-size: 32px;
+            opacity: 0;
+            animation: subtitleFlyIn 1s ease-out forwards;
+        }
+        @keyframes subtitleFlyIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .arrow {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 48px;
+            color: white;
+            opacity: 0;
+            animation: fadeIn 2s ease-out forwards, blink 0.5s infinite alternate 1s;
+        }
+        .arrow:hover {
+            color: red;
+            animation-play-state: paused;
+        }
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+        @keyframes blink {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
 </head>
 <body>
-    <header>
-        <h1>EasyCraftLauncher</h1>
-    </header>
-    <main>
-        <section id="features">
-            <h2>功能介绍</h2>
-            <p>快速下载资源<img src="images/flash.svg" alt="快速下载" class="icon"></p>
-            <p>纯python的启动器<img src="images/python.svg" alt="python" class="icon"></p>
-            <p>支持无网络启动<img src="images/offline.svg" alt="无网络状态" class="icon"></p>
-        </section>
-        <section id="download">
-            <h2>下载</h2>
-            <a href="https://github.com/MotWnb/EasyCraftLauncher" class="download-button" target="_blank">立即下载<img src="images/download.svg" alt="下载" class="icon"></a>
-        </section>
-        <section id="about">
-            <h2>关于我们</h2>
-            <p>dsxbmotw<span class="team-link" href="https://github.com/motwnb">dsxbmotw: https://github.com/motwnb</span></p>
-            <p>XJ_gout<span class="team-link" href="https://github.com/XJgout">XJ_gout: https://github.com/XJgout</span></p>
-        </section>
-    </main>
-    <footer>
-        <p>&copy; 2024 EasyCraftLauncher. All rights reserved.</p>
-    </footer>
+    <div>
+        <div class="title">Easy Craft Launcher</div>
+        <div class="subtitle">ECL</div>
+    </div>
+    <div class="arrow">↓</div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var arrow = document.querySelector('.arrow');
+            arrow.addEventListener('click', function() {
+                window.location.href = 'information.html';
+            });
+        });
+    </script>
 </body>
 </html>
