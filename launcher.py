@@ -197,11 +197,15 @@ def main():
     process = subprocess.Popen(bat_file_path, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
     while True:
-        output = process.stdout.readline().encode('utf-8', errors='ignore')
-        if output == '' and process.poll() is not None:
-            break
-        if output:
-            print(output.strip())
+        try:
+            output = process.stdout.readline()
+            if output == '' and process.poll() is not None:
+                break
+            if output:
+                print(output.strip())
+
+        except Exception:
+            pass
 
     # 等待进程结束
     exit_code = process.wait()
