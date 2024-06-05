@@ -1,14 +1,14 @@
 import concurrent.futures
-import shutil
-import zipfile
-import os
-import sys
 import json
-import requests
+import os
 import platform
-import uuid
-import time
+import shutil
 import subprocess
+import sys
+import uuid
+import zipfile
+
+import requests
 from requests.adapters import HTTPAdapter
 
 
