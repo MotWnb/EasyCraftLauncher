@@ -91,7 +91,7 @@ def main():
     cp_str = cp_str.replace("/", "\\")
     # 自动生成离线版UUID并储存到players.json
     username = input("请输入用户名:")
-    uid = uuid.uuid4()
+    uid = str(uuid.uuid4())
     players_json = {}
     players_file_path = os.path.join(minecraft_dir, "players.json")
 
@@ -104,7 +104,7 @@ def main():
     if username in players_json:
         uid = players_json[username]["uuid"]
     else:
-        players_json[username] = {"uuid": str(uid)}
+        players_json[username] = {"uuid": uid}
 
     # 将更新后的数据写回文件
     with open(players_file_path, "w") as f:

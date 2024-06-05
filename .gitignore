@@ -1,7 +1,9 @@
 /.minecraft
-/.idea/.gitignore
+/.gitignore
 /java
 /version_manifest.json
 /arguments_game.properties
 /arguments_jvm.properties
 /.idea
+/launcher.bat
+/logs
