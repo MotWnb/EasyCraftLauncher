@@ -7,6 +7,7 @@ import json
 import requests
 import platform
 import uuid
+import subprocess
 from requests.adapters import HTTPAdapter
 
 
@@ -125,8 +126,12 @@ def main():
                     continue
                 if "windows" in version_json["arguments"]["jvm"][i]["rules"][0]["os"]["name"]:
                     if get_os_name() == version_json["arguments"]["jvm"][i]["rules"][0]["os"]["name"]:
-                        if version_json["arguments"]["jvm"][i]["value"] == "-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump":
-                            f.write("-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump\n")
+                        if version_json["arguments"]["jvm"][i][
+                            "value"] == ("-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft"
+                                         ".exe.heapdump"):
+                            f.write(
+                                "-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe"
+                                ".heapdump\n")
                     continue
         f.write("-XX:+UseG1GC\n")
         f.write("-XX:-OmitStackTraceInFastThrow\n")
@@ -134,7 +139,7 @@ def main():
             if isinstance(jvm_arguments, str):
                 if '-' in jvm_arguments:
                     if '-cp' in jvm_arguments:
-                        f.write("-cp=${classpath}\n")
+                        f.write("-cp ${classpath}\n")
                     else:
                         f.write(jvm_arguments + "\n")
 
@@ -146,12 +151,11 @@ def main():
 
     with open("arguments_jvm.properties", "r") as f:
         arguments_jvm = f.read()
-    arguments_jvm = arguments_jvm.replace("${natives_directory}", natives_dir)
+    arguments_jvm = arguments_jvm.replace("${natives_directory}", '"' + natives_dir + '"')
     arguments_jvm = arguments_jvm.replace("${launcher_name}", "ECL")
     arguments_jvm = arguments_jvm.replace("${launcher_version}", "1.0.0-PREVIEW")
     arguments_jvm = arguments_jvm.replace("${classpath}", cp_str)
     arguments_jvm = arguments_jvm.replace("\n", " ")
-    print(arguments_jvm)
 
     with open("arguments_game.properties", "r") as f:
         arguments_game_list = f.readlines()
@@ -176,5 +180,10 @@ def main():
             user_type_arguments_game = "--userType msa" + " "
         if arguments_game == "--versionType\n":
             version_type_arguments_game = "--versionType ECL" + " "
-    argument_game = username_arguments_game + version_arguments_game + game_dir_arguments_game + assets_dir_arguments_game + index_arguments_game + uuid_arguments_game + clientid_arguments_game + access_token_arguments_game + user_type_arguments_game + version_type_arguments_game
+    argument_game = "net.minecraft.client.main.Main" + username_arguments_game + version_arguments_game + game_dir_arguments_game + assets_dir_arguments_game + index_arguments_game + uuid_arguments_game + clientid_arguments_game + access_token_arguments_game + user_type_arguments_game + version_type_arguments_game
     arguments = arguments_jvm + argument_game
+    print(arguments)
+    java_version = str(version_json["javaVersion"]["majorVersion"])
+    java_path = os.path.join(current_dir, "java", "jdk" + java_version)
+    entries = os.listdir(java_path)[0]
+    java_path = os.path.join(java_path, entries, "bin", "java.exe")
