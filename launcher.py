@@ -7,6 +7,7 @@ import json
 import requests
 import platform
 import uuid
+import time
 import subprocess
 from requests.adapters import HTTPAdapter
 
@@ -186,4 +187,22 @@ def main():
     java_version = str(version_json["javaVersion"]["majorVersion"])
     java_path = os.path.join(current_dir, "java", "jdk" + java_version)
     entries = os.listdir(java_path)[0]
-    java_path = os.path.join(java_path, entries, "bin", "java.exe")
+    java_path = '"' + os.path.join(java_path, entries, "bin", "java.exe") + '" '
+    arguments = java_path + arguments
+    bat_file_path = "launcher.bat"
+    with open(bat_file_path, "w+") as f:
+        f.write(arguments)
+        f.close()
+    # 运行批处理文件，并实时输出
+    process = subprocess.Popen(bat_file_path, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+    while True:
+        output = process.stdout.readline().encode('utf-8', errors='ignore')
+        if output == '' and process.poll() is not None:
+            break
+        if output:
+            print(output.strip())
+
+    # 等待进程结束
+    exit_code = process.wait()
+    print(f"批处理文件退出代码: {exit_code}")
