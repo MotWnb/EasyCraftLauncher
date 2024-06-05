@@ -74,8 +74,8 @@ def main():
     except FileNotFoundError:
         print("错误代码：0，找不到版本文件")
         sys.exit()
-    natives_dir = os.path.join(versions_dir, version_choice, f"{version_choice}-natives")
-    with concurrent.futures.ThreadPoolExecutor() as executor:
+    natives_dir = os.path.join(versions_dir, version_choice, version_choice + "-natives")
+    with concurrent.futures.ThreadPoolExecutor(max_workers=192) as executor:
         for library in version_json["libraries"]:
             save_path = str(os.path.join(current_dir, ".minecraft/libraries", library["downloads"]["artifact"]["path"]))
             if "rules" in library:

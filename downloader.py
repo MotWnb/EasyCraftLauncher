@@ -21,14 +21,10 @@ def download_minecraft_version():
 
     def download_file(url_download, save_path_download):
         response = http.get(url_download, verify=False)
-        save_path_download = os.path.join(current_dir, save_path_download)
-        # 创建文件所在的目录（如果需要）
-        dir_name = os.path.dirname(save_path_download)
-        if not os.path.exists(dir_name):
-            os.makedirs(dir_name)
+        save_path_download = os.path.join(minecraft_dir, save_path_download)
+        os.makedirs(os.path.dirname(save_path_download), exist_ok=True)
         with open(save_path_download, 'wb') as f:
             f.write(response.content)
-            f.close()
 
     # 下载并读取版本清单文件
     version_manifest_url = "https://piston-meta.mojang.com/mc/game/version_manifest.json"
@@ -58,7 +54,7 @@ def download_minecraft_version():
 
             # 下载依赖库文件
             print("开始下载依赖库文件")
-            with concurrent.futures.ThreadPoolExecutor() as executor:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=192) as executor:
                 library_downloads = (
                     (library["downloads"]["artifact"]["url"], library["downloads"]["artifact"]["path"])
                     for library in version_json["libraries"]
@@ -77,7 +73,7 @@ def download_minecraft_version():
                 asset_json = json.load(f)
 
             # 下载资源文件
-            with concurrent.futures.ThreadPoolExecutor() as executor:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=192) as executor:
                 for asset, info in asset_json["objects"].items():
                     hash = info["hash"]
                     url = f"https://resources.download.minecraft.net/{hash[:2]}/{hash}"

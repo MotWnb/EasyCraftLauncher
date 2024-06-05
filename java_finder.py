@@ -7,7 +7,7 @@ import threading
 def scan_drive(drive, results):
     for root, dirs, files in os.walk(drive):
         if 'java.exe' in files:
-            java_exe_path = os.path.join(root, 'java.exe')
+            java_exe_path = root + '\\java.exe'
             try:
                 # 执行java.exe -version命令并捕获输出
                 output = subprocess.check_output([java_exe_path, '-version'], stderr=subprocess.STDOUT, text=True)
@@ -31,7 +31,7 @@ def find_java_exe_and_versions_in_all_drives():
     results = {}
 
     # 创建线程列表
-    threads = []
+    threads = [threading.Thread(target=scan_drive, args=(drive, results)) for drive in drives[:192]]
 
     # 为每个盘符创建并启动一个线程
     for drive in drives:
