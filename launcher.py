@@ -28,7 +28,7 @@ def get_os_name():
     elif sys.platform.startswith('darwin'):
         return 'osx'
     else:
-        print("#Warning# 未知的操作系统类型,将无法自动解压natives文件")
+        print("错误代码：2，未知的操作系统类型,将无法自动解压natives文件")
         sys.exit(1)
 
 
