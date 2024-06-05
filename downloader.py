@@ -71,7 +71,7 @@ def download_minecraft_version():
             # 下载资源文件清单
             print("开始下载资源文件")
             asset_index = version_json["assetIndex"]
-            asset_index_path = os.path.join(minecraft_dir, "assets", "indexes", f"{asset_index['id']}.json")
+            asset_index_path = os.path.join(minecraft_dir, "assets", "indexes", f"{version_choice}.json")
             download_file(asset_index["url"], asset_index_path)
             with open(asset_index_path, "r") as f:
                 asset_json = json.load(f)

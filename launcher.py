@@ -183,7 +183,6 @@ def main():
             version_type_arguments_game = "--versionType ECL" + " "
     argument_game = "net.minecraft.client.main.Main " + username_arguments_game + version_arguments_game + game_dir_arguments_game + assets_dir_arguments_game + index_arguments_game + uuid_arguments_game + clientid_arguments_game + access_token_arguments_game + user_type_arguments_game + version_type_arguments_game
     arguments = arguments_jvm + argument_game
-    print(arguments)
     java_version = str(version_json["javaVersion"]["majorVersion"])
     java_path = os.path.join(current_dir, "java", "jdk" + java_version)
     entries = os.listdir(java_path)[0]
