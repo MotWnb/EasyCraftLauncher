@@ -20,7 +20,7 @@ def scan_drive(drive, results):
                         # 将结果添加到字典中
                         results[java_exe_path] = version
             except subprocess.CalledProcessError as e:
-                print("无法获取Java版本信息:", e.output.decode('utf-8'))
+                print("错误代码：1，无法获取Java版本信息:", e.output.decode('utf-8'))
 
 
 # 创建并启动线程的函数

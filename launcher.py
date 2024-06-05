@@ -65,13 +65,15 @@ def main():
     http = requests.Session()
     http.mount('http://', adapter)
     http.mount('https://', adapter)
-
-    versions = os.listdir(versions_dir)
-    version_choice = input(f"请输入需要启动的版本名称: {str(versions)} ")
-    version_json_path = os.path.join(versions_dir, version_choice, f"{version_choice}.json")
-    with open(version_json_path, "r") as f:
-        version_json = json.load(f)
-
+    try:
+        versions = os.listdir(versions_dir)
+        version_choice = input(f"请输入需要启动的版本名称: {str(versions)} ")
+        version_json_path = os.path.join(versions_dir, version_choice, f"{version_choice}.json")
+        with open(version_json_path, "r") as f:
+            version_json = json.load(f)
+    except FileNotFoundError:
+        print("错误代码：0，找不到版本文件")
+        sys.exit()
     natives_dir = os.path.join(versions_dir, version_choice, f"{version_choice}-natives")
     with concurrent.futures.ThreadPoolExecutor() as executor:
         for library in version_json["libraries"]:
@@ -204,7 +206,8 @@ def main():
                 print(output.strip())
 
         except Exception:
-            pass
+            print("错误代码：114514，未知原因")
+            sys.exit()
 
     # 等待进程结束
     exit_code = process.wait()
