@@ -5,6 +5,7 @@ import requests
 import jdk
 import urllib3
 from requests.adapters import HTTPAdapter
+from tqdm.rich import tqdm
 
 
 def download_minecraft_version():
@@ -57,7 +58,7 @@ def download_minecraft_version():
             with concurrent.futures.ThreadPoolExecutor(max_workers=192) as executor:
                 library_downloads = (
                     (library["downloads"]["artifact"]["url"], library["downloads"]["artifact"]["path"])
-                    for library in version_json["libraries"]
+                    for library in tqdm(version_json["libraries"])
                     if "downloads" in library
                 )
                 for url, path in library_downloads:
@@ -74,7 +75,7 @@ def download_minecraft_version():
 
             # 下载资源文件
             with concurrent.futures.ThreadPoolExecutor(max_workers=192) as executor:
-                for asset, info in asset_json["objects"].items():
+                for asset, info in tqdm(asset_json["objects"].items()):
                     hash = info["hash"]
                     url = f"https://resources.download.minecraft.net/{hash[:2]}/{hash}"
                     save_path = os.path.join(minecraft_dir, "assets", "objects", hash[:2], hash)
