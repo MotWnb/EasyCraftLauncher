@@ -1,4 +1,4 @@
-from downloader import main as d
+from downloader import download_minecraft_version as d
 from launcher import main as l
 
 
