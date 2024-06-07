@@ -21,12 +21,13 @@ def download_minecraft_version():
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
     def download_file(url_download, save_path_download):
-        response = http.get(url_download, verify=False)
+        response = http.get(url_download, stream=True, verify=False)
         response.raise_for_status()
         save_path_download = os.path.join(minecraft_dir, save_path_download)
         os.makedirs(os.path.dirname(save_path_download), exist_ok=True)
         with open(save_path_download, 'wb') as f:
-            f.write(response.content)
+            for chunk in response.iter_content(chunk_size=1024):
+                f.write(chunk)
 
     # 下载并读取版本清单文件
     version_manifest_url = "https://piston-meta.mojang.com/mc/game/version_manifest.json"
