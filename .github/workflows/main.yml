@@ -35,22 +35,8 @@ jobs:
           name: ${{ runner.os }} Build
           path: |
             build/*.exe
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
+
+      - name: GH Release
+        uses: softprops/action-gh-release@v2.0.5
         with:
-          tag_name: ${{ github.sha }}
-          name: Release ${{ github.sha }}
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Upload Release Asset
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ github.sha }}
-          name: Release ${{ github.sha }}
-          draft: false
-          prerelease: false
           files: build/*.exe
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
