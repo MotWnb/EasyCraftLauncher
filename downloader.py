@@ -7,8 +7,6 @@ from requests.adapters import HTTPAdapter
 import urllib3
 
 
-# 假设 jdk.install 函数已经定义在其他地方，否则需要导入相应的库
-
 def download_minecraft_version():
     # 配置请求会话
     adapter = HTTPAdapter(max_retries=5, pool_block=True)
@@ -26,7 +24,7 @@ def download_minecraft_version():
         save_path_download = os.path.join(minecraft_dir, save_path_download)
         os.makedirs(os.path.dirname(save_path_download), exist_ok=True)
         with open(save_path_download, 'wb') as f:
-            for chunk in response.iter_content(chunk_size=1024):
+            for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
 
     # 下载并读取版本清单文件
