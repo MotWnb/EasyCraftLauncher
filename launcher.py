@@ -8,6 +8,7 @@ import sys
 import uuid
 import zipfile
 import requests
+import threading
 from requests.adapters import HTTPAdapter
 
 
@@ -34,6 +35,18 @@ def extract_files(save_path, natives_dir, arch):
                     os.makedirs(os.path.dirname(extract_path))
                 with jar.open(info) as source, open(extract_path, 'wb') as target:
                     shutil.copyfileobj(source, target)
+
+
+def launch_game(arguments):
+    process = subprocess.Popen(arguments, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    while True:
+        output = process.stdout.readline()
+        if output == '' and process.poll() is not None:
+            break
+        if output:
+            print(output.strip())
+    exit_code = process.wait()
+    print(f"游戏进程退出代码: {exit_code}")
 
 
 def main():
@@ -127,11 +140,7 @@ def main():
     with open("arguments_game.properties", "r") as f:
         arguments_game_list = f.readlines()
     argument_game = "net.minecraft.client.main.Main "
-    for arguments_game in arguments_game_list:
-        if arguments_game.startswith("--"):
-            argument_game += arguments_game.strip() + " "
     argument_game += f"--username {username} --version {version_choice} --gameDir {minecraft_dir}\\{version_choice} --assetsDir {assets_dir} --assetIndex {version_choice} --uuid {uid.replace('-', '')} --clientId 114514 --accessToken {uid.replace('-', '')} --userType msa --versionType ECL"
-
     arguments = arguments_jvm + argument_game
     java_version = version_json["javaVersion"]["majorVersion"]
     java_path = os.path.join(current_dir, "java", f"jdk{java_version}")
@@ -142,14 +151,5 @@ def main():
     with open("launcher.bat", "w+") as f:
         f.write(arguments)
 
-    process = subprocess.Popen("launcher.bat", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-
-    while True:
-        output = process.stdout.readline()
-        if output == '' and process.poll() is not None:
-            break
-        if output:
-            print(output.strip())
-
-    exit_code = process.wait()
-    print(f"批处理文件退出代码: {exit_code}")
+    game_thread = threading.Thread(target=launch_game, args=(arguments,))
+    game_thread.start()
