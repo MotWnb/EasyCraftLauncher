@@ -37,10 +37,11 @@ jobs:
             build/*.exe
       - name: Generate tag
         run: |
-          TAG_NAME="v$(date +%Y%m%d)"
-          echo "Creating tag: $TAG_NAME"
-          git tag -a $TAG_NAME -m "Automated release$TAG_NAME"
-          git push origin $TAG_NAME
+          $env:TAG_NAME="v$(Get-Date -Format 'yyyyMMdd')"
+          echo "Creating tag: $env:TAG_NAME"
+          git tag -a $env:TAG_NAME -m "Automated release$env:TAG_NAME"
+          git push origin $env:TAG_NAME
+
       - name: GH Release
         uses: softprops/action-gh-release@v2.0.5
         with:
