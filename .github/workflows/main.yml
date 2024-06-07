@@ -44,7 +44,11 @@ jobs:
           $env:TAG_NAME="v$(Get-Date -Format 'yyyyMMdd')"
           echo "Creating tag: $env:TAG_NAME"
           git tag -a $env:TAG_NAME -m "Automated release$env:TAG_NAME"
+          # Use the GITHUB_TOKEN for authentication
           git push origin $env:TAG_NAME
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
