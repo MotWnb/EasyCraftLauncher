@@ -1,5 +1,5 @@
-from downloader import download_minecraft_version
-from launcher import main as m
+from downloader import main as d
+from launcher import main as l
 
 
 def main():
@@ -9,9 +9,9 @@ def main():
                    "请选择:")
     match int(choice):
         case 1:
-            download_minecraft_version()
+            d()
         case 2:
-            m()
+            l()
 
 
 if __name__ == '__main__':
