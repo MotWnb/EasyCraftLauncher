@@ -35,14 +35,18 @@ jobs:
           name: ${{ runner.os }} Build
           path: |
             build/*.exe
-      - name: Generate tag
+      - name: Set up Git user
+        run: |
+          git config --global user.email "your-email@example.com"
+          git config --global user.name "Your Name"
+      - name: Generate and push tag
         run: |
           $env:TAG_NAME="v$(Get-Date -Format 'yyyyMMdd')"
           echo "Creating tag: $env:TAG_NAME"
           git tag -a $env:TAG_NAME -m "Automated release$env:TAG_NAME"
           git push origin $env:TAG_NAME
-
-      - name: GH Release
-        uses: softprops/action-gh-release@v2.0.5
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
           files: build/*.exe
+          token: ${{ secrets.GITHUB_TOKEN }}
