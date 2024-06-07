@@ -7,55 +7,40 @@ import subprocess
 import sys
 import uuid
 import zipfile
-
 import requests
 from requests.adapters import HTTPAdapter
 
 
-def get_os_bits():
-    return 'x64' if platform.machine().endswith('64') else 'x32'
-
-
-def get_os_platforms():
+def get_arch():
     return 'x64' if platform.machine().endswith('64') else 'x86'
 
 
-def get_os_name():
-    if sys.platform.startswith('win'):
-        return 'windows'
-    elif sys.platform.startswith('linux'):
-        return 'linux'
-    elif sys.platform.startswith('darwin'):
-        return 'osx'
-    else:
+def get_os():
+    systems = {'win32': 'windows', 'linux': 'linux', 'darwin': 'osx'}
+    os_name = systems.get(sys.platform)
+    if not os_name:
         print("错误代码：2，未知的操作系统类型,将无法自动解压natives文件")
         sys.exit(1)
+    return os_name
 
 
 def extract_files(save_path, natives_dir, arch):
     with zipfile.ZipFile(save_path, 'r') as jar:
-        for file_info in jar.infolist():
-            if file_info.filename.startswith('META-INF/') or file_info.filename.endswith('/'):
-                continue
-            if arch not in file_info.filename:
-                continue
-            filename = os.path.basename(file_info.filename)
-            extract_path = os.path.join(natives_dir, filename)
-            dir_name = os.path.dirname(extract_path)
-            if not os.path.exists(dir_name):
-                os.makedirs(dir_name)
-            source = jar.open(file_info)
-            target = open(extract_path, 'wb')
-            with source, target:
-                shutil.copyfileobj(source, target)
+        for info in jar.infolist():
+            if not info.filename.startswith('META-INF/') and arch in info.filename:
+                filename = os.path.basename(info.filename)
+                extract_path = os.path.join(natives_dir, filename)
+                if not os.path.exists(os.path.dirname(extract_path)):
+                    os.makedirs(os.path.dirname(extract_path))
+                with jar.open(info) as source, open(extract_path, 'wb') as target:
+                    shutil.copyfileobj(source, target)
 
 
 def main():
-    global username_arguments_game, version_arguments_game, game_dir_arguments_game, index_arguments_game, assets_dir_arguments_game, uuid_arguments_game, clientid_arguments_game, access_token_arguments_game, user_type_arguments_game, version_type_arguments_game
-    jvm_params = ""
+    jvm_params = []
     cp_list = []
-    arch = get_os_bits()
-    os_name = get_os_name()
+    arch = get_arch()
+    os_name = get_os()
     current_dir = os.getcwd()
     minecraft_dir = os.path.join(current_dir, ".minecraft")
     versions_dir = os.path.join(minecraft_dir, "versions")
@@ -65,86 +50,65 @@ def main():
     http = requests.Session()
     http.mount('http://', adapter)
     http.mount('https://', adapter)
+
     try:
         versions = os.listdir(versions_dir)
-        version_choice = input(f"请输入需要启动的版本名称: {str(versions)} ")
+        version_choice = input(f"请输入需要启动的版本名称: {versions} ")
         version_json_path = os.path.join(versions_dir, version_choice, f"{version_choice}.json")
         with open(version_json_path, "r") as f:
             version_json = json.load(f)
     except FileNotFoundError:
         print("错误代码：0，找不到版本文件")
-        sys.exit()
+        sys.exit(1)
+
     natives_dir = os.path.join(versions_dir, version_choice, version_choice + "-natives")
     with concurrent.futures.ThreadPoolExecutor(max_workers=192) as executor:
         for library in version_json["libraries"]:
-            save_path = str(os.path.join(current_dir, ".minecraft/libraries", library["downloads"]["artifact"]["path"]))
-            if "rules" in library:
-                for rule in library["rules"]:
-                    if rule["action"] == "allow" and rule["os"]["name"] == os_name:
-                        cp_list.append(save_path)
-                        executor.submit(extract_files, save_path, natives_dir, arch)
-            else:
+            save_path = os.path.join(current_dir, ".minecraft/libraries", library["downloads"]["artifact"]["path"])
+            if "rules" in library and any(
+                    rule["action"] == "allow" and rule["os"]["name"] == os_name for rule in library["rules"]):
                 cp_list.append(save_path)
+                executor.submit(extract_files, save_path, natives_dir, arch)
+            elif "rules" not in library:
+                cp_list.append(save_path)
+
     cp_str = cp_list[0]
     del cp_list[0]
     for i in cp_list:
-        cp_str = cp_str + ";" + i
-    cp_str = cp_str + ";" + str(os.path.join(versions_dir, version_choice, f"{version_choice}.jar"))
+        cp_str += ";" + i
+    cp_str += ";" + os.path.join(versions_dir, version_choice, f"{version_choice}.jar")
     cp_str = cp_str.replace("/", "\\")
-    # 自动生成离线版UUID并储存到players.json
+
+    # UUID and player data handling
     username = input("请输入用户名:")
     uid = str(uuid.uuid4())
     players_json = {}
     players_file_path = os.path.join(minecraft_dir, "players.json")
 
-    # 检查文件是否存在且不为空
     if os.path.exists(players_file_path) and os.path.getsize(players_file_path) > 0:
         with open(players_file_path, "r") as f:
             players_json = json.load(f)
 
-    # 处理用户名和UUID
     if username in players_json:
         uid = players_json[username]["uuid"]
     else:
         players_json[username] = {"uuid": uid}
 
-    # 将更新后的数据写回文件
     with open(players_file_path, "w") as f:
         json.dump(players_json, f, indent=4)
 
-    # 启动游戏
-    version_json_path = os.path.join(minecraft_dir, "versions", version_choice, f"{version_choice}.json")
+    # Launch game
     with open(version_json_path, "r") as f:
         version_json = json.load(f)
+
     with open("arguments_jvm.properties", "w+") as f:
-        for i in range(len(version_json['arguments']['jvm'])):
-            if type(version_json["arguments"]["jvm"][i]) == dict:
-                if "arch" in version_json["arguments"]["jvm"][i]["rules"][0]["os"]:
-                    if get_os_platforms() == version_json["arguments"]["jvm"][i]["rules"][0]["os"]["arch"]:
-                        f.write("-Xss1M\n")
-                    continue
-                if "osx" in version_json["arguments"]["jvm"][i]["rules"][0]["os"]["name"]:
-                    if get_os_name() == version_json["arguments"]["jvm"][i]["rules"][0]["os"]["name"]:
-                        f.write("-XstartOnFirstThread\n")
-                    continue
-                if "windows" in version_json["arguments"]["jvm"][i]["rules"][0]["os"]["name"]:
-                    if get_os_name() == version_json["arguments"]["jvm"][i]["rules"][0]["os"]["name"]:
-                        if version_json["arguments"]["jvm"][i][
-                            "value"] == ("-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft"
-                                         ".exe.heapdump"):
-                            f.write(
-                                "-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe"
-                                ".heapdump\n")
-                    continue
-        f.write("-XX:+UseG1GC\n")
-        f.write("-XX:-OmitStackTraceInFastThrow\n")
-        for jvm_arguments in version_json["arguments"]["jvm"]:
-            if isinstance(jvm_arguments, str):
-                if '-' in jvm_arguments:
-                    if '-cp' in jvm_arguments:
+        for i in version_json['arguments']['jvm']:
+            if isinstance(i, str):
+                if '-' in i:
+                    if '-cp' in i:
                         f.write("-cp ${classpath}\n")
                     else:
-                        f.write(jvm_arguments + "\n")
+                        f.write(i + "\n")
 
     with open("arguments_game.properties", "w+") as f:
         for game_arguments in version_json["arguments"]["game"]:
@@ -154,7 +118,7 @@ def main():
 
     with open("arguments_jvm.properties", "r") as f:
         arguments_jvm = f.read()
-    arguments_jvm = arguments_jvm.replace("${natives_directory}", '"' + natives_dir + '"')
+    arguments_jvm = arguments_jvm.replace("${natives_directory}", natives_dir)
     arguments_jvm = arguments_jvm.replace("${launcher_name}", "ECL")
     arguments_jvm = arguments_jvm.replace("${launcher_version}", "1.0.0-PREVIEW")
     arguments_jvm = arguments_jvm.replace("${classpath}", cp_str)
@@ -162,53 +126,30 @@ def main():
 
     with open("arguments_game.properties", "r") as f:
         arguments_game_list = f.readlines()
+    argument_game = "net.minecraft.client.main.Main "
     for arguments_game in arguments_game_list:
-        if arguments_game == "--username\n":
-            username_arguments_game = "--username " + username + " "
-        if arguments_game == "--version\n":
-            version_arguments_game = "--version " + version_choice + " "
-        if arguments_game == "--gameDir\n":
-            game_dir_arguments_game = "--gameDir " + minecraft_dir + "\\" + version_choice + " "
-        if arguments_game == "--assetsDir\n":
-            assets_dir_arguments_game = "--assetsDir " + assets_dir + " "
-        if arguments_game == "--assetIndex\n":
-            index_arguments_game = "--assetIndex " + version_choice + " "
-        if arguments_game == "--uuid\n":
-            uuid_arguments_game = "--uuid " + uid.replace("-", "") + " "
-        if arguments_game == "--clientId\n":
-            clientid_arguments_game = "--clientId " + "114514" + " "
-        if arguments_game == "--accessToken\n":
-            access_token_arguments_game = "--accessToken " + uid.replace("-", "") + " "
-        if arguments_game == "--userType\n":
-            user_type_arguments_game = "--userType msa" + " "
-        if arguments_game == "--versionType\n":
-            version_type_arguments_game = "--versionType ECL" + " "
-    argument_game = "net.minecraft.client.main.Main " + username_arguments_game + version_arguments_game + game_dir_arguments_game + assets_dir_arguments_game + index_arguments_game + uuid_arguments_game + clientid_arguments_game + access_token_arguments_game + user_type_arguments_game + version_type_arguments_game
+        if arguments_game.startswith("--"):
+            argument_game += arguments_game.strip() + " "
+    argument_game += f"--username {username} --version {version_choice} --gameDir {minecraft_dir}\\{version_choice} --assetsDir {assets_dir} --assetIndex {version_choice} --uuid {uid.replace('-', '')} --clientId 114514 --accessToken {uid.replace('-', '')} --userType msa --versionType ECL"
+
     arguments = arguments_jvm + argument_game
-    java_version = str(version_json["javaVersion"]["majorVersion"])
-    java_path = os.path.join(current_dir, "java", "jdk" + java_version)
+    java_version = version_json["javaVersion"]["majorVersion"]
+    java_path = os.path.join(current_dir, "java", f"jdk{java_version}")
     entries = os.listdir(java_path)[0]
-    java_path = '"' + os.path.join(java_path, entries, "bin", "java.exe") + '" '
-    arguments = java_path + arguments
-    bat_file_path = "launcher.bat"
-    with open(bat_file_path, "w+") as f:
+    java_path = os.path.join(java_path, entries, "bin", "java.exe")
+    arguments = f'"{java_path}" {arguments}'
+
+    with open("launcher.bat", "w+") as f:
         f.write(arguments)
-        f.close()
-    # 运行批处理文件，并实时输出
-    process = subprocess.Popen(bat_file_path, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+    process = subprocess.Popen("launcher.bat", shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
     while True:
-        try:
-            output = process.stdout.readline()
-            if output == '' and process.poll() is not None:
-                break
-            if output:
-                print(output.strip())
+        output = process.stdout.readline()
+        if output == '' and process.poll() is not None:
+            break
+        if output:
+            print(output.strip())
 
-        except Exception:
-            print("错误代码：114514，未知原因")
-            sys.exit()
-
-    # 等待进程结束
     exit_code = process.wait()
     print(f"批处理文件退出代码: {exit_code}")
