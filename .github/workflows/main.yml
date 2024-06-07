@@ -1,9 +1,5 @@
 name: Python auto build
-on:
-  workflow_dispatch:
-  push:
-    branches:
-      - master
+on: workflow_dispatch
 permissions:
   pull-requests: write
 jobs:
