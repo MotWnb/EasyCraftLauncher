@@ -1,8 +1,6 @@
 name: Build Windows executable
 
 on:
-  # 手动
-  workflow_dispatch:
   push:
     branches:
       - master
@@ -63,8 +61,8 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: $TAG_NAME
-        release_name: "Release $TAG_NAME"
+        tag_name: ${{ steps.set_tag_name.outputs.TAG_NAME }}
+        release_name: "Release ${{ steps.set_tag_name.outputs.TAG_NAME }}"
         draft: false
         prerelease: false
 
