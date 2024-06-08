@@ -1,6 +1,5 @@
 import concurrent.futures
 import os
-import jdk
 import json
 import requests
 from requests.adapters import HTTPAdapter
@@ -77,19 +76,10 @@ def download_minecraft_version():
             # 下载资源文件
             with concurrent.futures.ThreadPoolExecutor() as asset_executor:
                 for asset, info in asset_json["objects"].items():
-                    hash = info["hash"]
-                    url = f"https://resources.download.minecraft.net/{hash[:2]}/{hash}"
-                    save_path = os.path.join(minecraft_dir, "assets", "objects", hash[:2], hash)
+                    hash_assets = info["hash"]
+                    url = f"https://resources.download.minecraft.net/{hash_assets[:2]}/{hash_assets}"
+                    save_path = os.path.join(minecraft_dir, "assets", "objects", hash_assets[:2], hash_assets)
                     if not os.path.exists(save_path):
                         asset_executor.submit(download_file, url, save_path)
 
-            # 下载JDK
-            java_version = str(version_json["javaVersion"]["majorVersion"])
-            java_install_path = os.path.join(current_dir, "java", f"jdk{java_version}")
-            if not os.path.exists(java_install_path):
-                print(f"JDK{java_version} 不存在，正在下载...")
-                os.makedirs(java_install_path)
-                jdk.install(java_version, vendor='Azul', path=java_install_path)
-            else:
-                print(f"JDK{java_version} 已存在")
-            break
+

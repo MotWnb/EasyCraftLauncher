@@ -7,6 +7,8 @@ import subprocess
 import sys
 import uuid
 import zipfile
+import jdk_system
+import jdk
 import requests
 import threading
 from requests.adapters import HTTPAdapter
@@ -50,7 +52,6 @@ def launch_game(arguments):
 
 
 def main():
-    jvm_params = []
     cp_list = []
     arch = get_arch()
     os_name = get_os()
@@ -73,6 +74,25 @@ def main():
     except FileNotFoundError:
         print("错误代码：0，找不到版本文件")
         sys.exit(1)
+    # 下载JDK
+    java_version = str(version_json["javaVersion"]["majorVersion"])
+    java_path = os.path.join(current_dir, "java", f"jdk{java_version}")
+    if not os.path.exists(java_path):
+        java = jdk_system.find_java_exe_and_versions_in_all_drives()
+        for i in java:
+            if java[i] == java_version:
+                print(f"JDK{java_version} 已存在")
+                java_path = i
+                # 执行其他需要的操作，比如检查JDK是否可用或更新
+                break
+        else:
+            os.makedirs(java_path)
+            jdk_system.download_jdk(jdk.get_download_url(java_version, vendor='Azul'), java_path)
+            # jdk.install(java_version, vendor='Azul', path=java_install_path)
+    else:
+        print(f"JDK{java_version} 已存在")
+        # 执行其他需要的操作，比如检查JDK是否可用或更新
+    print(java_path)
 
     natives_dir = os.path.join(versions_dir, version_choice, version_choice + "-natives")
     with concurrent.futures.ThreadPoolExecutor(max_workers=192) as executor:
@@ -137,15 +157,9 @@ def main():
     arguments_jvm = arguments_jvm.replace("${classpath}", cp_str)
     arguments_jvm = arguments_jvm.replace("\n", " ")
 
-    with open("arguments_game.properties", "r") as f:
-        arguments_game_list = f.readlines()
     argument_game = "net.minecraft.client.main.Main "
     argument_game += f"--username {username} --version {version_choice} --gameDir {minecraft_dir}\\{version_choice} --assetsDir {assets_dir} --assetIndex {version_choice} --uuid {uid.replace('-', '')} --clientId 114514 --accessToken {uid.replace('-', '')} --userType msa --versionType ECL"
     arguments = arguments_jvm + argument_game
-    java_version = version_json["javaVersion"]["majorVersion"]
-    java_path = os.path.join(current_dir, "java", f"jdk{java_version}")
-    entries = os.listdir(java_path)[0]
-    java_path = os.path.join(java_path, entries, "bin", "java.exe")
     arguments = f'"{java_path}" {arguments}'
 
     with open("launcher.bat", "w+") as f:
