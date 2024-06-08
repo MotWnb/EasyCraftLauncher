@@ -47,24 +47,26 @@ jobs:
         # 获取最新的 commit 信息
         $COMMIT_MESSAGE = git log -1 --pretty=%B
         # 生成标签名，包含日期和 commit 信息
-        $TAG_NAME = "v$(Get-Date -Format 'yyyy.MM.dd')-$($COMMIT_MESSAGE.Split([Environment]::NewLine)[0].Replace([IO.Path]::GetInvalidFileNameChars(), '_'))"
+        # 使用正则表达式替换掉非法字符
+        $TAG_NAME = "v$(Get-Date -Format 'yyyy.MM.dd')-$($COMMIT_MESSAGE.Split([Environment]::NewLine)[0] -replace '[^a-zA-Z0-9.-]', '_')"
         # 创建并推送标签
-        git tag -a $TAG_NAME -m$COMMIT_MESSAGE
+        git tag -a $TAG_NAME -m "$COMMIT_MESSAGE"
         git push origin $TAG_NAME
       shell: powershell
 
       # 创建一个新的发布
     - name: Create release
+      id: create_release
       uses: actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: $TAG_NAME_SANITIZED
-        release_name: "Release $TAG_NAME_SANITIZED"
+        tag_name: $TAG_NAME
+        release_name: "Release $TAG_NAME"
         draft: false
         prerelease: false
 
-
+      # 上传构建的可执行文件到发布
     - name: Upload release asset
       uses: actions/upload-release-asset@v1
       env:
@@ -74,3 +76,4 @@ jobs:
         asset_path: ./dist/main.exe
         asset_name: main.exe
         asset_content_type: application/octet-stream
+
