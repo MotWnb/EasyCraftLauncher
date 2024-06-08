@@ -4,7 +4,11 @@ permissions:
   pull-requests: write
 jobs:
   build:
-    runs-on: windows-latest
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Check-out repository
@@ -13,8 +17,8 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          architecture: 'x64'
+          python-version: '3.11' # Version range or exact version of a Python version to use, using SemVer's version range syntax
+          architecture: 'x64' # optional x64 or x86. Defaults to x64 if not specified
           cache: 'pip'
           cache-dependency-path: |
             **/requirements*.txt
@@ -36,3 +40,5 @@ jobs:
           name: ${{ runner.os }} Build
           path: |
             build/*.exe
+            build/*.bin
+            build/*.app/**/*
