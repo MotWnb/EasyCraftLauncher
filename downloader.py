@@ -8,9 +8,11 @@ import urllib3
 
 def download_minecraft_version():
     # 配置请求会话
-    adapter = HTTPAdapter(max_retries=5, pool_block=True)
+    adapter = HTTPAdapter(max_retries=5, pool_block=True, pool_maxsize=114514)
     http = requests.Session()
     http.mount('http://', adapter)
+    http.mount('https://', adapter)
+
 
     # 定义工作目录
     current_dir = os.getcwd()
