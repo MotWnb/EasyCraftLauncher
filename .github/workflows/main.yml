@@ -47,9 +47,10 @@ jobs:
         # 获取最新的 commit 信息
         $COMMIT_MESSAGE = git log -1 --pretty=%B
         # 生成标签名，包含日期和 commit 信息
-        $TAG_NAME = "v$(Get-Date -Format 'yyyy.MM.dd')-$($COMMIT_MESSAGE.Split([Environment]::NewLine)[0].Replace([IO.Path]::GetInvalidFileNameChars(), '_'))"
+        # 使用正则表达式替换掉非法字符
+        $TAG_NAME = "v$(Get-Date -Format 'yyyy.MM.dd')-$($COMMIT_MESSAGE.Split([Environment]::NewLine)[0] -replace '[^a-zA-Z0-9.-]', '_')"
         # 创建并推送标签
-        git tag -a $TAG_NAME -m$COMMIT_MESSAGE
+        git tag -a $TAG_NAME -m "$COMMIT_MESSAGE"
         git push origin $TAG_NAME
       shell: powershell
 
