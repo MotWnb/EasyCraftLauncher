@@ -28,7 +28,7 @@ jobs:
       run: pyinstaller --onefile main.py
 
     - name: Upload artifact
-      uses: echapmanFromBunnings/upload-artifact@v3.0.0
+      uses: actions/upload-artifact@v3
       with:
         name: main.exe
         path: dist/main.exe
