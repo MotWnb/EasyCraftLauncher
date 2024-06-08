@@ -1,6 +1,8 @@
 name: Build Windows executable
 
 on:
+  # 手动
+  workflow_dispatch:
   push:
     branches:
       - master
