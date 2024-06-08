@@ -32,3 +32,43 @@ jobs:
       with:
         name: main.exe
         path: dist/main.exe
+
+      # 获取最新的 commit 信息
+    - name: Get latest commit message
+      id: commit_message
+      run: |
+        echo ::set-output name=commit_message::$(git log -1 --pretty=%B)
+
+      # 创建一个新的标签
+    - name: Create tag
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+        COMMIT_MESSAGE="${{ steps.commit_message.outputs.commit_message }}"
+        TAG_NAME="v$(date +%Y.%m.%d)-${COMMIT_MESSAGE}"
+        # 确保标签名是合法的，例如去除特殊字符
+        TAG_NAME_SANITIZED=$(echo "$TAG_NAME" | tr -d '[:space:]' | tr -d '*' | tr -d '\'' | tr -d '"' | tr -d ',' | tr -d ';' | tr -d '(' | tr -d ')')
+        git tag -a "$TAG_NAME_SANITIZED" -m "$COMMIT_MESSAGE"
+        git push origin "$TAG_NAME_SANITIZED"
+
+      # 创建一个新的发布
+    - name: Create release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: $TAG_NAME_SANITIZED
+        release_name: "Release $TAG_NAME_SANITIZED"
+        draft: false
+        prerelease: false
+
+
+    - name: Upload release asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./dist/main.exe
+        asset_name: main.exe
+        asset_content_type: application/octet-stream
