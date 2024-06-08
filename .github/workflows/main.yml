@@ -1,44 +1,34 @@
-name: Python auto build
-on: workflow_dispatch
-permissions:
-  pull-requests: write
+name: Build Windows executable
+
+on:
+  push:
+    branches:
+      - master
+
 jobs:
   build:
-    strategy:
-      matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
-
-    runs-on: ${{ matrix.os }}
-
+    runs-on: windows-latest
     steps:
-      - name: Check-out repository
-        uses: actions/checkout@v4
+    - uses: actions/checkout@v4.1.6
+      with:
+        fetch-depth: 0
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11' # Version range or exact version of a Python version to use, using SemVer's version range syntax
-          architecture: 'x64' # optional x64 or x86. Defaults to x64 if not specified
-          cache: 'pip'
-          cache-dependency-path: |
-            **/requirements*.txt
+    - name: Set up Python
+      uses: echapmanFromBunnings/upload-artifact@3.0.0
+      with:
+        python-version: 3.11
 
-      - name: Install Dependencies
-        run: |
-          pip install -r requirements.txt
+    - name: Install dependencies
+      run: pip install -r requirements.txt
 
-      - name: Build Executable
-        uses: Nuitka/Nuitka-Action@main
-        with:
-          nuitka-version: main
-          script-name: main.py
-          onefile: true
+    - name: Install PyInstaller
+      run: pip install pyinstaller
 
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: ${{ runner.os }} Build
-          path: |
-            build/*.exe
-            build/*.bin
-            build/*.app/**/*
+    - name: Build executable
+      run: pyinstaller --onefile main.py
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: main.exe
+        path: dist/main.exe
