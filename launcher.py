@@ -42,7 +42,8 @@ def extract_files(save_path, natives_dir, arch):
 
 def launch_game(arguments):
     start_time = time.time()
-    process = subprocess.Popen(arguments, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, text=True)
+    process = subprocess.Popen(arguments, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                               stdin=subprocess.PIPE, text=True)
 
     while True:
         try:
@@ -64,6 +65,7 @@ def launch_game(arguments):
 
 
 def main():
+    java_path = ""
     cp_list = []
     arch = get_arch()
     os_name = get_os()
@@ -88,22 +90,18 @@ def main():
         sys.exit(1)
     # 下载JDK
     java_version = str(version_json["javaVersion"]["majorVersion"])
-    java_path = os.path.join(current_dir, "java", f"jdk{java_version}")
-    if not os.path.exists(java_path):
-        java = jdk_system.find_java_exe_and_versions_in_all_drives()
-        for i in java:
-            if java[i] == java_version:
-                print(f"JDK{java_version} 已存在")
-                java_path = i
-                # 执行其他需要的操作，比如检查JDK是否可用或更新
-                break
-        else:
-            os.makedirs(java_path)
-            jdk_system.download_jdk(jdk.get_download_url(java_version, vendor='Azul'), java_path)
-            # jdk.install(java_version, vendor='Azul', path=java_install_path)
-    else:
-        print(f"JDK{java_version} 已存在")
-        # 执行其他需要的操作，比如检查JDK是否可用或更新
+    java = jdk_system.find_java_exe_and_versions_in_all_drives()
+    for i in java:
+        if java[i] == java_version:
+            print(f"JDK{java_version} 已存在")
+            java_path = i
+            # 执行其他需要的操作，比如检查JDK是否可用或更新
+            break
+    if java_path == "":
+        java_path = os.path.join(current_dir, "java", f"jdk{java_version}")
+        os.makedirs(java_path)
+        jdk_system.download_jdk(jdk.get_download_url(java_version, vendor='Azul'), java_path)
+        java_path = os.path.join(java_path, os.listdir(java_path)[0], "bin", "java.exe")
     print(java_path)
 
     natives_dir = os.path.join(versions_dir, version_choice, version_choice + "-natives")
