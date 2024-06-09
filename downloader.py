@@ -13,7 +13,6 @@ def download_minecraft_version():
     http.mount('http://', adapter)
     http.mount('https://', adapter)
 
-
     # 定义工作目录
     current_dir = os.getcwd()
     minecraft_dir = os.path.join(current_dir, ".minecraft")
@@ -83,5 +82,3 @@ def download_minecraft_version():
                     save_path = os.path.join(minecraft_dir, "assets", "objects", hash_assets[:2], hash_assets)
                     if not os.path.exists(save_path):
                         asset_executor.submit(download_file, url, save_path)
-
-

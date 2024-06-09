@@ -11,6 +11,7 @@ import jdk_system
 import jdk
 import requests
 import threading
+import time
 from requests.adapters import HTTPAdapter
 
 
@@ -40,13 +41,24 @@ def extract_files(save_path, natives_dir, arch):
 
 
 def launch_game(arguments):
-    process = subprocess.Popen(arguments, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    start_time = time.time()
+    process = subprocess.Popen(arguments, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, text=True)
+
     while True:
-        output = process.stdout.readline()
-        if output == '' and process.poll() is not None:
-            break
-        if output:
-            print(output.strip())
+        try:
+            current_time = time.time()
+            if current_time - start_time > 1:  # 5分钟
+                process.stdin.write("System.gc()\n")
+                process.stdin.flush()
+                start_time = current_time  # 重置计时器
+
+            output = process.stdout.readline()
+            if output == '' and process.poll() is not None:
+                break
+            if output:
+                print(output.strip())
+        except Exception as e:
+            print(e)
     exit_code = process.wait()
     print(f"游戏进程退出代码: {exit_code}")
 
