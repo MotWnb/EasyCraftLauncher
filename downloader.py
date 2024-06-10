@@ -1,12 +1,19 @@
+from concurrent.futures import as_completed
 import concurrent.futures
 import os
 import json
+import shutil
+import sys
+import zipfile
 import requests
 from requests.adapters import HTTPAdapter
 import urllib3
+import platform
 
 
 def download_minecraft_version():
+    futures = []
+    extracts = []
     # 配置请求会话
     adapter = HTTPAdapter(max_retries=5, pool_block=True, pool_maxsize=114514)
     http = requests.Session()
@@ -26,6 +33,20 @@ def download_minecraft_version():
         with open(save_path_download, 'wb') as f:
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
+
+    def extract_files(save_path, natives_dir, arch):
+        try:
+            with zipfile.ZipFile(save_path, 'r') as jar:
+                for info in jar.infolist():
+                    if not info.filename.startswith('META-INF/') and arch in info.filename and not info.filename.endswith('/'):
+                        filename = os.path.basename(info.filename)
+                        extract_path = os.path.join(natives_dir, filename)
+                        if not os.path.exists(os.path.dirname(extract_path)):
+                            os.makedirs(os.path.dirname(extract_path))
+                        with jar.open(info) as source, open(extract_path, 'wb') as target:
+                            shutil.copyfileobj(source, target)
+        except Exception as e:
+            pass
 
     # 下载并读取版本清单文件
     version_manifest_url = "https://piston-meta.mojang.com/mc/game/version_manifest.json"
@@ -64,11 +85,11 @@ def download_minecraft_version():
                 for url, path in library_downloads:
                     save_path = os.path.join(minecraft_dir, "libraries", path)
                     if not os.path.exists(save_path):
-                        library_executor.submit(download_file, url, save_path)
+                        futures.append(library_executor.submit(download_file, url, save_path))
 
             # 下载资源文件清单
             asset_index = version_json["assetIndex"]
-            asset_index_path = os.path.join(minecraft_dir, "assets", "indexes", f"{version_choice}.json")
+            asset_index_path = os.path.join(minecraft_dir, "assets", "indexes", f"{asset_index['id']}.json")
             if not os.path.exists(asset_index_path):
                 download_file(asset_index["url"], asset_index_path)
             with open(asset_index_path, "r") as f:
@@ -82,3 +103,19 @@ def download_minecraft_version():
                     save_path = os.path.join(minecraft_dir, "assets", "objects", hash_assets[:2], hash_assets)
                     if not os.path.exists(save_path):
                         asset_executor.submit(download_file, url, save_path)
+
+            systems = {'win32': 'windows', 'linux': 'linux', 'darwin': 'osx'}
+            os_name = systems.get(sys.platform)
+            arch = 'x64' if platform.machine().endswith('64') else 'x86'
+            for future in as_completed(futures):
+                pass
+            natives_dir = os.path.join(minecraft_dir, "versions", version_choice, version_choice + "-natives")
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                for library in version_json["libraries"]:
+                    if "rules" in library and any(
+                            rule["action"] == "allow" and rule["os"]["name"] == os_name for rule in library["rules"]):
+                        save_path = os.path.join(current_dir, ".minecraft/libraries",
+                                                 library["downloads"]["artifact"]["path"])
+                        extracts.append(executor.submit(extract_files, save_path, natives_dir, arch))
+            for extract in as_completed(extracts):
+                pass

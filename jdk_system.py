@@ -56,7 +56,6 @@ def find_java_exe_and_versions_in_all_drives():
     return results
 
 
-
 def download_range(url, start, end, filename):
     headers = {'Range': f'bytes={start}-{end}'}
     req = requests.get(url, headers=headers, stream=True)

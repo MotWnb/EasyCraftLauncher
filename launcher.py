@@ -2,42 +2,15 @@ import concurrent.futures
 import json
 import os
 import platform
-import shutil
 import subprocess
 import sys
 import uuid
-import zipfile
 import jdk_system
 import jdk
 import requests
 import threading
 import time
 from requests.adapters import HTTPAdapter
-
-
-def get_arch():
-    return 'x64' if platform.machine().endswith('64') else 'x86'
-
-
-def get_os():
-    systems = {'win32': 'windows', 'linux': 'linux', 'darwin': 'osx'}
-    os_name = systems.get(sys.platform)
-    if not os_name:
-        print("错误代码：2，未知的操作系统类型,将无法自动解压natives文件")
-        sys.exit(1)
-    return os_name
-
-
-def extract_files(save_path, natives_dir, arch):
-    with zipfile.ZipFile(save_path, 'r') as jar:
-        for info in jar.infolist():
-            if not info.filename.startswith('META-INF/') and arch in info.filename:
-                filename = os.path.basename(info.filename)
-                extract_path = os.path.join(natives_dir, filename)
-                if not os.path.exists(os.path.dirname(extract_path)):
-                    os.makedirs(os.path.dirname(extract_path))
-                with jar.open(info) as source, open(extract_path, 'wb') as target:
-                    shutil.copyfileobj(source, target)
 
 
 def launch_game(arguments):
@@ -65,10 +38,10 @@ def launch_game(arguments):
 
 
 def main():
+    systems = {'win32': 'windows', 'linux': 'linux', 'darwin': 'osx'}
+    os_name = systems.get(sys.platform)
     java_path = ""
     cp_list = []
-    arch = get_arch()
-    os_name = get_os()
     current_dir = os.getcwd()
     minecraft_dir = os.path.join(current_dir, ".minecraft")
     versions_dir = os.path.join(minecraft_dir, "versions")
@@ -88,6 +61,7 @@ def main():
     except FileNotFoundError:
         print("错误代码：0，找不到版本文件")
         sys.exit(1)
+    asset_index = version_json["assetIndex"]
     # 下载JDK
     java_version = str(version_json["javaVersion"]["majorVersion"])
     java = jdk_system.find_java_exe_and_versions_in_all_drives()
@@ -95,7 +69,6 @@ def main():
         if java[i] == java_version:
             print(f"JDK{java_version} 已存在")
             java_path = i
-            # 执行其他需要的操作，比如检查JDK是否可用或更新
             break
     if java_path == "":
         java_path = os.path.join(current_dir, "java", f"jdk{java_version}")
@@ -105,13 +78,12 @@ def main():
     print(java_path)
 
     natives_dir = os.path.join(versions_dir, version_choice, version_choice + "-natives")
-    with concurrent.futures.ThreadPoolExecutor(max_workers=192) as executor:
+    with concurrent.futures.ThreadPoolExecutor():
         for library in version_json["libraries"]:
             save_path = os.path.join(current_dir, ".minecraft/libraries", library["downloads"]["artifact"]["path"])
             if "rules" in library and any(
                     rule["action"] == "allow" and rule["os"]["name"] == os_name for rule in library["rules"]):
                 cp_list.append(save_path)
-                executor.submit(extract_files, save_path, natives_dir, arch)
             elif "rules" not in library:
                 cp_list.append(save_path)
 
@@ -168,7 +140,7 @@ def main():
     arguments_jvm = arguments_jvm.replace("\n", " ")
 
     argument_game = "net.minecraft.client.main.Main "
-    argument_game += f"--username {username} --version {version_choice} --gameDir {minecraft_dir}\\{version_choice} --assetsDir {assets_dir} --assetIndex {version_choice} --uuid {uid.replace('-', '')} --clientId 114514 --accessToken {uid.replace('-', '')} --userType msa --versionType ECL"
+    argument_game += f"--username {username} --version {version_choice} --gameDir {minecraft_dir}\\{version_choice} --assetsDir {assets_dir} --assetIndex {asset_index['id']} --uuid {uid.replace('-', '')} --clientId 114514 --accessToken {uid.replace('-', '')} --userType msa --versionType ECL"
     arguments = arguments_jvm + argument_game
     arguments = f'"{java_path}" {arguments}'
 
