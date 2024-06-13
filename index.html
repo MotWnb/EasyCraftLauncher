@@ -8,82 +8,117 @@
         body, html {
             height: 100%;
             margin: 0;
+            font-family: Arial, sans-serif;
         }
         body {
-            background-image: url('images/background.png');
+            background: url('background.png') no-repeat center center fixed;
             background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            color: lightgreen;
-            font-family: Arial, sans-serif;
             display: flex;
-            flex-direction: column;
             justify-content: center;
             align-items: center;
             overflow: hidden;
-            animation: backgroundFadeIn 1s ease-out;
-            backdrop-filter: blur(10px); /* 添加毛玻璃效果 */
         }
-        @keyframes backgroundFadeIn {
-            from { background-position: 0 200%; }
-            to { background-position: 0 50%; }
+        .container {
+            max-width: 800px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            position: relative;
+            min-height: 300px; /* Adjust as needed */
+            overflow: auto;
+            height: 80%; /* 设置容器高度为100% */
         }
-        .title {
-            font-size: 48px;
+        .chinese {
+            font-size: 24px;
+            margin-bottom: 10px;
+            text-align: center;
+            animation: flyInLeft 2s forwards;
+        }
+        .english {
+            font-size: 16px;
+            text-align: left;
+            display: inline-block;
+            margin-left: 40px;
             margin-bottom: 20px;
-            opacity: 0;
-            animation: titleFlyIn 1s ease-out forwards;
+            animation: flyInRight 2s forwards;
         }
-        @keyframes titleFlyIn {
+        @keyframes flyInLeft {
             from { transform: translateX(-100%); opacity: 0; }
             to { transform: translateX(0); opacity: 1; }
         }
-        .subtitle {
-            font-size: 32px;
-            opacity: 0;
-            animation: subtitleFlyIn 1s ease-out forwards;
-        }
-        @keyframes subtitleFlyIn {
+        @keyframes flyInRight {
             from { transform: translateX(100%); opacity: 0; }
             to { transform: translateX(0); opacity: 1; }
         }
-        .arrow {
-            position: absolute;
-            bottom: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 48px;
-            color: white;
-            opacity: 0;
-            animation: fadeIn 2s ease-out forwards, blink 0.5s infinite alternate 1s;
+        .github-link {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000; /* 确保按钮在容器之上 */
         }
-        .arrow:hover {
-            color: red;
-            animation-play-state: paused;
+        .flash-button {
+            background-color: white;
+            color: black;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 16px;
             cursor: pointer;
+            opacity: 0.5;
+            animation: opacityAnimation 2s infinite alternate;
+            text-decoration: none;
         }
-        @keyframes fadeIn {
-            to { opacity: 1; }
+        .flash-button:hover {
+            background-color: #90ee90;
+            animation: none;
+            cursor: pointer;
+            opacity: 1;
         }
-        @keyframes blink {
-            from { opacity: 0; }
-            to { opacity: 1; }
+        .flash-button:active {
+            background-color: #008000;
+            opacity: 1;
+        }
+        @keyframes opacityAnimation {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
         }
     </style>
 </head>
 <body>
-    <div>
-        <div class="title">Easy Craft Launcher</div>
-        <div class="subtitle">ECL</div>
+    <div class="container">
+        <div class="chinese">欢迎来到Easy Craft Launcher！</div>
+        <div class="english">Welcome to Easy Craft Launcher！</div>
+
+
+        <div class="chinese">Easy Craft Launcher是一款由中国人使用Python编写的《我的世界》Java版启动器，致力于为玩家提供快速、稳定的游戏体验。</div>
+        <div class="english">Easy Craft Launcher is a Minecraft Java Edition launcher crafted with Python by a Chinese developer, aiming to deliver a fast and stable gaming experience to players.</div>
+
+        <div class="chinese">虽然目前我们的启动器仅支持命令行操作，没有图形用户界面（GUI），但我们通过GitHub Action实现了自动打包成可执行文件（exe），让玩家轻松安装和启动游戏。</div>
+        <div class="english">Although our launcher currently operates through the command line without a graphical user interface (GUI), we have implemented a GitHub Action to automatically package it into an executable file (exe), making it easy for players to install and launch the game.</div>
+
+        <div class="chinese">我们的亮点：</div>
+        <div class="english">Our highlights:</div>
+
+        <div class="chinese">- 一键启动：无需复杂的配置，只需一个命令，即可快速进入游戏。</div>
+        <div class="english">- One-click Launch: No complex configurations needed - just one command to quickly dive into the game.</div>
+
+        <div class="chinese">- 自动更新：通过GitHub Action，我们确保启动器的版本始终保持最新。</div>
+        <div class="english">- Automatic Updates: With GitHub Action, we ensure that the launcher is always up-to-date.</div>
+
+        <div class="chinese">- 轻量级：没有GUI意味着更少的资源占用，让您的游戏运行更加流畅。</div>
+        <div class="english">- Lightweight: The absence of GUI means fewer resource requirements, allowing for a smoother gaming experience.</div>
+
+        <div class="chinese">- 社区驱动：我们倾听社区的声音，不断优化和改进启动器。</div>
+        <div class="english">- Community-driven: We listen to the community and continuously optimize and improve the launcher.</div>
+
+        <div class="chinese">立即体验Easy Craft Launcher，享受《我的世界》的无穷魅力！</div>
+        <div class="english">Experience Easy Craft Launcher now and immerse yourself in the endless charm of Minecraft!</div>
+
     </div>
-    <div class="arrow">↓</div>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            var arrow = document.querySelector('.arrow');
-            arrow.addEventListener('click', function() {
-                window.location.href = 'information.html';
-            });
-        });
-    </script>
+    <div class="github-link">
+        <a href="https://github.com/motwnb/EasyCraftLauncher" class="flash-button">访问GitHub仓库</a>
+    </div>
 </body>
 </html>
