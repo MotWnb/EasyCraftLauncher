@@ -1,6 +1,7 @@
 import time
 import winreg
 import requests
+import json
 from selenium import webdriver
 from selenium.webdriver.edge.service import Service as EdgeService
 from webdriver_manager.microsoft import EdgeChromiumDriverManager
@@ -43,14 +44,10 @@ def get_authorization_code():
     if driver is None:
         print("没有找到合适的浏览器。")
         return None
-
-    url = (
-        "https://login.live.com/oauth20_authorize.srf"
-        "?client_id=00000000402b5328"
-        "&response_type=code"
-        "&scope=service%3A%3Auser.auth.xboxlive.com%3A%3AMBI_SSL"
-        "&redirect_uri=https%3A%2F%2Flogin.live.com%2Foauth20_desktop.srf"
-    )
+    # 事实上应该有一个prompt=login&，但是为了测试先不加
+    url = ("https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?client_id=00000000402b5328"
+           "&response_type=code&scope=service%3A%3Auser.auth.xboxlive.com%3A%3AMBI_SSL&redirect_uri=https:%2F%2Flogin"
+           ".live.com%2Foauth20_desktop.srf")
     driver.get(url)
 
     # 循环检查当前URL
@@ -68,86 +65,201 @@ def get_authorization_code():
         time.sleep(1)
 
 
-def exchange_auth_code_for_token(auth_code):
-    # POST请求的URL
+def ms_login_step2(code, is_refresh=False):
+    print("开始微软登录步骤 2（刷新登录" if is_refresh else "非刷新登录）")
+
     url = "https://login.live.com/oauth20_token.srf"
-
-    # POST请求的数据
-    data = {
-        "client_id": "00000000402b5328",
-        "code": auth_code,
-        "grant_type": "authorization_code",
-        "redirect_uri": "https://login.live.com/oauth20_desktop.srf",
-        "scope": "service::user.auth.xboxlive.com::MBI_SSL"
-    }
-
-    # 设置请求头
     headers = {
         "Content-Type": "application/x-www-form-urlencoded"
     }
 
-    # 发送POST请求
-    response = requests.post(url, data=data, headers=headers)
-
-    # 检查响应状态码
-    if response.status_code == 200:
-        # 解析响应数据
-        token_data = response.json()
-        access_token = token_data.get("access_token")
-        return access_token
+    if is_refresh:
+        payload = {
+            "client_id": "00000000402b5328",
+            "refresh_token": code,
+            "grant_type": "refresh_token",
+            "redirect_uri": "https://login.live.com/oauth20_desktop.srf",
+            "scope": "service::user.auth.xboxlive.com::MBI_SSL"
+        }
     else:
-        # 如果响应状态码不是200，打印错误信息
-        print("Error exchanging auth code for token:", response.status_code, response.text)
-        return None
-def xbox_live_authentication(access_token):
-    # Xbox Live身份验证的URL
-    url = "https://user.auth.xboxlive.com/user/authenticate"
+        payload = {
+            "client_id": "00000000402b5328",
+            "code": code,
+            "grant_type": "authorization_code",
+            "redirect_uri": "https://login.live.com/oauth20_desktop.srf",
+            "scope": "service::user.auth.xboxlive.com::MBI_SSL"
+        }
 
-    # POST请求的数据
-    data = {
+    try:
+        response = requests.post(url, headers=headers, data=payload)
+        response.raise_for_status()
+        result_json = response.json()
+    except requests.exceptions.HTTPError as e:
+        if "must sign in again" in e.message or "invalid_grant" in e.message:
+            return "Relogin", ""
+        else:
+            raise
+
+    access_token = result_json.get("access_token")
+    refresh_token = result_json.get("refresh_token")
+    return access_token, refresh_token
+
+
+def ms_login_step3(access_token):
+    print("开始微软登录步骤 3")
+
+    url = "https://user.auth.xboxlive.com/user/authenticate"
+    headers = {
+        "Content-Type": "application/json"
+    }
+
+    payload = {
         "Properties": {
             "AuthMethod": "RPS",
             "SiteName": "user.auth.xboxlive.com",
-            "RpsTicket": f"d={access_token}"  # 第二步中获取的访问令牌
+            "RpsTicket": access_token
         },
         "RelyingParty": "http://auth.xboxlive.com",
         "TokenType": "JWT"
     }
 
-    # 设置请求头
-    headers = {
-        "Content-Type": "application/json",
-        "Accept": "application/json"
+    try:
+        response = requests.post(url, headers=headers, json=payload)
+        response.raise_for_status()
+        result_json = response.json()
+    except requests.exceptions.HTTPError as e:
+        raise
+
+    xbl_token = result_json.get("Token")
+    return xbl_token
+
+
+def ms_login_step4(xbl_token):
+    print("开始微软登录步骤 4")
+
+    request_body = {
+        "Properties": {
+            "SandboxId": "RETAIL",
+            "UserTokens": [xbl_token]
+        },
+        "RelyingParty": "rp://api.minecraftservices.com/",
+        "TokenType": "JWT"
     }
 
-    # 发送POST请求
-    response = requests.post(url, json=data, headers=headers)
+    url = "https://xsts.auth.xboxlive.com/xsts/authorize"
+    headers = {
+        "Content-Type": "application/json"
+    }
 
-    # 检查响应状态码
-    if response.status_code == 200:
-        # 解析响应数据
-        xbox_live_data = response.json()
-        xbox_live_token = xbox_live_data.get("Token")
-        uhs = xbox_live_data.get("DisplayClaims", {}).get("xui", [{}])[0].get("uhs")
-        return xbox_live_token, uhs
+    try:
+        response = requests.post(url, headers=headers, json=request_body)
+        response.raise_for_status()
+        result_json = response.json()
+    except requests.exceptions.HTTPError as e:
+        raise
+
+    xsts_token = result_json.get("Token")
+    uhs = result_json.get("DisplayClaims", {}).get("xui", [{}])[0].get("uhs")
+    return xsts_token, uhs
+
+
+def ms_login_step5(tokens):
+    print("开始微软登录步骤 5")
+
+    identity_token = f"XBL3.0 x={tokens[1]};{tokens[0]}"
+    request_body = {
+        "identityToken": identity_token
+    }
+
+    url = "https://api.minecraftservices.com/authentication/login_with_xbox"
+    headers = {
+        "Content-Type": "application/json"
+    }
+
+    try:
+        response = requests.post(url, headers=headers, json=request_body)
+        response.raise_for_status()
+        result_json = response.json()
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 429:
+            print("微软登录第 5 步汇报 429")
+            raise Exception("登录尝试太过频繁，请等待几分钟后再试！")
+        elif e.response.status_code == 403:
+            print("微软登录第 5 步汇报 403")
+            raise Exception(
+                "当前 IP 的登录尝试异常。" + "\n" + "如果你使用了 VPN 或加速器，请把它们关掉或更换节点后再试！")
+        else:
+            raise
+
+    access_token = result_json.get("access_token")
+    return access_token
+
+
+def check_game_ownership(access_token):
+    url = "https://api.minecraftservices.com/entitlements/mcstore"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        result_json = response.json()
+    except requests.exceptions.HTTPError as e:
+        print(f"HTTP error occurred: {e}")
+        return False
+
+    if "items" in result_json and result_json["items"]:
+        return True
     else:
-        # 如果响应状态码不是200，打印错误信息
-        print("Error during Xbox Live authentication:", response.status_code, response.text)
-        return None, None
+        return False
 
 
+def ms_login_step7(access_token):
+    print("开始微软登录步骤 7")
+
+    url = "https://api.minecraftservices.com/minecraft/profile"
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        result_json = response.json()
+    except requests.exceptions.HTTPError as e:
+        print(f"HTTP error occurred: {e}")
+        return None, None, None
+
+    uuid = result_json.get("id")
+    username = result_json.get("name")
+    return uuid, username, response.text
 
 
 # 使用函数
 print("开始步骤1：请在弹出的浏览器窗口中登录你的Microsoft账号")
 authorization_code = get_authorization_code()
 print("步骤1完成：授权码已获取:", authorization_code)
-access_token = exchange_auth_code_for_token(authorization_code)
-print("步骤2完成：访问令牌已获取:", access_token)
-xbox_live_token, uhs = xbox_live_authentication(access_token)
-if xbox_live_token and uhs:
-    print("Xbox Live authentication successful.")
-    print("Xbox Live Token:", xbox_live_token)
-    print("User Hash (uhs):", uhs)
+access_token, refresh_token = ms_login_step2(authorization_code)
+print("Access Token:", access_token)
+print("Refresh Token:", refresh_token)
+xbl_token = ms_login_step3(access_token)
+print("Xbox Live Token:", xbl_token)
+xsts_token, uhs = ms_login_step4(xbl_token)
+print("XSTS Token:", xsts_token)
+print("User Hash:", uhs)
+tokens = [xsts_token, uhs]
+access_token = ms_login_step5(tokens)
+print("Minecraft Access Token:", access_token)
+if check_game_ownership(access_token):
+    print("用户拥有Minecraft游戏。")
 else:
-    print("Xbox Live authentication failed.")
+    print("用户没有Minecraft游戏。")
+uuid, username, result = ms_login_step7(access_token)
+if uuid and username:
+    print("玩家ID (UUID):", uuid)
+    print("玩家昵称:", username)
+else:
+    print("获取玩家信息失败。")
