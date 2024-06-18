@@ -10,6 +10,7 @@ import jdk
 import requests
 import threading
 import time
+import auth
 from requests.adapters import HTTPAdapter
 
 
@@ -95,8 +96,16 @@ def main():
     cp_str = cp_str.replace("/", "\\")
 
     # UUID and player data handling
-    username = input("请输入用户名:")
-    uid = str(uuid.uuid4())
+    while True:
+        answer = input("请输入\n1. 使用离线登录\n2. 使用正版登录\n")
+        if answer == "1":
+            username = input("请输入用户名:")
+            uid = str(uuid.uuid4())
+            access_token = uid
+            break
+        elif answer == "2":
+            uid, username, access_token = auth.perform_ms_login()
+            break
     players_json = {}
     players_file_path = os.path.join(minecraft_dir, "players.json")
 
@@ -105,7 +114,7 @@ def main():
             players_json = json.load(f)
 
     if username in players_json:
-        uid = players_json[username]["uuid"]
+        uid = players_json[username]["uuid"].replace('-', '')
     else:
         players_json[username] = {"uuid": uid}
 
@@ -116,31 +125,20 @@ def main():
     with open(version_json_path, "r") as f:
         version_json = json.load(f)
 
-    with open("arguments_jvm.properties", "w+") as f:
-        for i in version_json['arguments']['jvm']:
-            if isinstance(i, str):
-                if '-' in i:
-                    if '-cp' in i:
-                        f.write("-cp ${classpath}\n")
-                    else:
-                        f.write(i + "\n")
-
-    with open("arguments_game.properties", "w+") as f:
-        for game_arguments in version_json["arguments"]["game"]:
-            if isinstance(game_arguments, str):
-                if '-' in game_arguments:
-                    f.write(game_arguments + "\n")
-
-    with open("arguments_jvm.properties", "r") as f:
-        arguments_jvm = f.read()
+    arguments_jvm = ""
+    for i in version_json['arguments']['jvm']:
+        if isinstance(i, str):
+            if '-' in i:
+                if '-cp' in i:
+                    arguments_jvm += "-cp ${classpath}\n"
+                else:
+                    arguments_jvm += i + "\n"
     arguments_jvm = arguments_jvm.replace("${natives_directory}", natives_dir)
     arguments_jvm = arguments_jvm.replace("${launcher_name}", "ECL")
     arguments_jvm = arguments_jvm.replace("${launcher_version}", "1.0.0-PREVIEW")
     arguments_jvm = arguments_jvm.replace("${classpath}", cp_str)
     arguments_jvm = arguments_jvm.replace("\n", " ")
-
-    argument_game = "net.minecraft.client.main.Main "
-    argument_game += f"--username {username} --version {version_choice} --gameDir {minecraft_dir}\\{version_choice} --assetsDir {assets_dir} --assetIndex {asset_index['id']} --uuid {uid.replace('-', '')} --clientId 114514 --accessToken {uid.replace('-', '')} --userType msa --versionType ECL"
+    argument_game = f"net.minecraft.client.main.Main --username {username} --version {version_choice} --gameDir {minecraft_dir}\\{version_choice} --assetsDir {assets_dir} --assetIndex {asset_index['id']} --uuid {uid} --clientId 114514 --accessToken {access_token} --userType msa --versionType ECL"
     arguments = arguments_jvm + argument_game
     arguments = f'"{java_path}" {arguments}'
 
@@ -148,4 +146,5 @@ def main():
         f.write(arguments)
 
     game_thread = threading.Thread(target=launch_game, args=(arguments,))
+    print("正在启动游戏......")
     game_thread.start()

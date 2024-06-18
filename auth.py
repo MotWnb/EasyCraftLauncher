@@ -1,7 +1,7 @@
+import threading
 import time
 import winreg
 import requests
-import json
 from selenium import webdriver
 from selenium.webdriver.edge.service import Service as EdgeService
 from webdriver_manager.microsoft import EdgeChromiumDriverManager
@@ -31,21 +31,15 @@ def find_browser_reg_path(browser_name):
 def get_authorization_code():
     # 检测Microsoft Edge
     edge_path = find_browser_reg_path('Edge')
-    # 检测Google Chrome
     chrome_path = find_browser_reg_path('Chrome')
-    driver = None
     if edge_path:
         print(f"Microsoft Edge 已安装: {edge_path}")
         driver = webdriver.Edge(service=EdgeService(EdgeChromiumDriverManager().install()))
-    elif chrome_path:
+    else:
         print(f"Google Chrome 已安装: {chrome_path}")
         driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()))
 
-    if driver is None:
-        print("没有找到合适的浏览器。")
-        return None
-    # 事实上应该有一个prompt=login&，但是为了测试先不加
-    url = ("https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?client_id=00000000402b5328"
+    url = ("https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?prompt=login&client_id=00000000402b5328"
            "&response_type=code&scope=service%3A%3Auser.auth.xboxlive.com%3A%3AMBI_SSL&redirect_uri=https:%2F%2Flogin"
            ".live.com%2Foauth20_desktop.srf")
     driver.get(url)
@@ -53,20 +47,15 @@ def get_authorization_code():
     # 循环检查当前URL
     while True:
         current_url = driver.current_url
-        # 检查URL是否包含授权码
         if "https://login.live.com/oauth20_desktop.srf?code=" in current_url:
-            # 提取授权码
             code = current_url.split("code=")[1].split("&")[0]
-            print("授权码:", code)
-            driver.quit()  # 关闭浏览器
+            threading.Thread(target=driver.quit).start()
             return code
-
-        # 等待一段时间再检查，避免过于频繁的检查消耗CPU资源
         time.sleep(1)
 
 
 def ms_login_step2(code, is_refresh=False):
-    print("开始微软登录步骤 2（刷新登录" if is_refresh else "非刷新登录）")
+    print("开始微软登录步骤 2(刷新登录)" if is_refresh else "开始微软登录步骤 2(非刷新登录)")
 
     url = "https://login.live.com/oauth20_token.srf"
     headers = {
@@ -95,10 +84,7 @@ def ms_login_step2(code, is_refresh=False):
         response.raise_for_status()
         result_json = response.json()
     except requests.exceptions.HTTPError as e:
-        if "must sign in again" in e.message or "invalid_grant" in e.message:
-            return "Relogin", ""
-        else:
-            raise
+        print(e)
 
     access_token = result_json.get("access_token")
     refresh_token = result_json.get("refresh_token")
@@ -238,28 +224,42 @@ def ms_login_step7(access_token):
     return uuid, username, response.text
 
 
-# 使用函数
-print("开始步骤1：请在弹出的浏览器窗口中登录你的Microsoft账号")
-authorization_code = get_authorization_code()
-print("步骤1完成：授权码已获取:", authorization_code)
-access_token, refresh_token = ms_login_step2(authorization_code)
-print("Access Token:", access_token)
-print("Refresh Token:", refresh_token)
-xbl_token = ms_login_step3(access_token)
-print("Xbox Live Token:", xbl_token)
-xsts_token, uhs = ms_login_step4(xbl_token)
-print("XSTS Token:", xsts_token)
-print("User Hash:", uhs)
-tokens = [xsts_token, uhs]
-access_token = ms_login_step5(tokens)
-print("Minecraft Access Token:", access_token)
-if check_game_ownership(access_token):
-    print("用户拥有Minecraft游戏。")
-else:
-    print("用户没有Minecraft游戏。")
-uuid, username, result = ms_login_step7(access_token)
-if uuid and username:
-    print("玩家ID (UUID):", uuid)
-    print("玩家昵称:", username)
-else:
-    print("获取玩家信息失败。")
+def perform_ms_login():
+    refresh_token = ""
+    try:
+        with open("latest.log", "r") as f:
+            refresh_token = f.read()
+    except Exception as e:
+        pass
+
+    if not refresh_token:
+        print("开始微软登录步骤1：请在弹出的浏览器窗口中登录你的Microsoft账号")
+        authorization_code = get_authorization_code()  # 1
+        access_token, refresh_token = ms_login_step2(authorization_code)  # 2
+    else:
+        access_token, refresh_token = ms_login_step2(refresh_token, True)  # 2
+
+    with open("latest.log", "w+") as f:
+        f.write(refresh_token)
+
+    xbl_token = ms_login_step3(access_token)  # 3
+    xsts_token, uhs = ms_login_step4(xbl_token)  # 4
+    tokens = [xsts_token, uhs]  # 5
+    access_token = ms_login_step5(tokens)  # 6
+
+    if check_game_ownership(access_token):
+        print("用户拥有Minecraft游戏。")
+    else:
+        print("用户没有Minecraft游戏。")
+
+    uuid, username, result = ms_login_step7(access_token)  # 7
+    if uuid and username:
+        print("玩家ID (UUID):", uuid)
+        print("玩家昵称:", username)
+        print("access_token:", access_token)
+    else:
+        print("获取玩家信息失败。")
+    return uuid, username, access_token
+
+
+# perform_ms_login()
