@@ -25,7 +25,7 @@ jobs:
       run: pip install pyinstaller
 
     - name: Build executable
-      run: pyinstaller --exclude-module=ssl --onefile main.py
+      run: pyinstaller --onefile main.py
 
     - name: Upload artifact
       uses: actions/upload-artifact@v3
