@@ -33,7 +33,7 @@ def launch_game(arguments):
             if output:
                 print(output.strip())
         except Exception as e:
-            print(e)
+            pass
     exit_code = process.wait()
     print(f"游戏进程退出代码: {exit_code}")
 
