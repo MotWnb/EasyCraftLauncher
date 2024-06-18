@@ -1,12 +1,17 @@
 import threading
 import time
 import winreg
+import urllib3
 import requests
 from selenium import webdriver
 from selenium.webdriver.edge.service import Service as EdgeService
 from webdriver_manager.microsoft import EdgeChromiumDriverManager
 from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.edge.options import Options
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 def find_browser_reg_path(browser_name):
@@ -29,15 +34,17 @@ def find_browser_reg_path(browser_name):
 
 
 def get_authorization_code():
+    options = Options()
+    options.add_argument("--no-proxy-server")
     # 检测Microsoft Edge
     edge_path = find_browser_reg_path('Edge')
     chrome_path = find_browser_reg_path('Chrome')
     if edge_path:
         print(f"Microsoft Edge 已安装: {edge_path}")
-        driver = webdriver.Edge(service=EdgeService(EdgeChromiumDriverManager().install()))
+        driver = webdriver.Edge(service=EdgeService(EdgeChromiumDriverManager().install()), options=options)
     else:
         print(f"Google Chrome 已安装: {chrome_path}")
-        driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()))
+        driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
 
     url = ("https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?prompt=login&client_id=00000000402b5328"
            "&response_type=code&scope=service%3A%3Auser.auth.xboxlive.com%3A%3AMBI_SSL&redirect_uri=https:%2F%2Flogin"
@@ -80,7 +87,7 @@ def ms_login_step2(code, is_refresh=False):
         }
 
     try:
-        response = requests.post(url, headers=headers, data=payload)
+        response = requests.post(url, headers=headers, data=payload, verify=False)
         response.raise_for_status()
         result_json = response.json()
     except requests.exceptions.HTTPError as e:
@@ -110,7 +117,7 @@ def ms_login_step3(access_token):
     }
 
     try:
-        response = requests.post(url, headers=headers, json=payload)
+        response = requests.post(url, headers=headers, json=payload, verify=False)
         response.raise_for_status()
         result_json = response.json()
     except requests.exceptions.HTTPError as e:
@@ -138,7 +145,7 @@ def ms_login_step4(xbl_token):
     }
 
     try:
-        response = requests.post(url, headers=headers, json=request_body)
+        response = requests.post(url, headers=headers, json=request_body, verify=False)
         response.raise_for_status()
         result_json = response.json()
     except requests.exceptions.HTTPError as e:
@@ -163,7 +170,7 @@ def ms_login_step5(tokens):
     }
 
     try:
-        response = requests.post(url, headers=headers, json=request_body)
+        response = requests.post(url, headers=headers, json=request_body, verify=False)
         response.raise_for_status()
         result_json = response.json()
     except requests.exceptions.HTTPError as e:
@@ -189,7 +196,7 @@ def check_game_ownership(access_token):
     }
 
     try:
-        response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=headers, verify=False)
         response.raise_for_status()
         result_json = response.json()
     except requests.exceptions.HTTPError as e:
@@ -212,7 +219,7 @@ def ms_login_step7(access_token):
     }
 
     try:
-        response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=headers, verify=False)
         response.raise_for_status()
         result_json = response.json()
     except requests.exceptions.HTTPError as e:
