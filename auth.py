@@ -46,7 +46,7 @@ def get_authorization_code():
         print(f"Google Chrome 已安装: {chrome_path}")
         driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
 
-    url = ("https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?prompt=login&client_id=00000000402b5328"
+    url = ("http://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?prompt=login&client_id=00000000402b5328"
            "&response_type=code&scope=service%3A%3Auser.auth.xboxlive.com%3A%3AMBI_SSL&redirect_uri=https:%2F%2Flogin"
            ".live.com%2Foauth20_desktop.srf")
     driver.get(url)
