@@ -1,10 +1,11 @@
 import concurrent.futures
 import json
 import os
-import platform
 import subprocess
 import sys
 import uuid
+from pathlib import Path
+
 import jdk_system
 import jdk
 import requests
@@ -34,8 +35,6 @@ def launch_game(arguments):
                 print(output.strip())
         except Exception as e:
             pass
-    exit_code = process.wait()
-    print(f"游戏进程退出代码: {exit_code}")
 
 
 def main():
@@ -65,18 +64,21 @@ def main():
     asset_index = version_json["assetIndex"]
     # 下载JDK
     java_version = str(version_json["javaVersion"]["majorVersion"])
-    java = jdk_system.find_java_exe_and_versions_in_all_drives()
-    for i in java:
-        if java[i] == java_version:
-            print(f"JDK{java_version} 已存在")
-            java_path = i
-            break
-    if java_path == "":
-        java_path = os.path.join(current_dir, "java", f"jdk{java_version}")
-        os.makedirs(java_path)
-        jdk_system.download_jdk(jdk.get_download_url(java_version, vendor='Azul'), java_path)
-        java_path = os.path.join(java_path, os.listdir(java_path)[0], "bin", "java.exe")
-    print(java_path)
+    java_exe_paths = jdk_system.find_java_exe_and_versions_in_all_drives(java_version)
+
+    # 检查是否存在指定版本的Java
+    if java_exe_paths:
+        print(f"JDK{java_version} 已存在")
+        java_path = next(iter(java_exe_paths))  # 返回找到的第一个java.exe路径
+
+    else:
+        # 如果不存在，则下载并设置Java环境
+        java_dir = Path.cwd() / "java" / f"jdk{java_version}"
+        java_dir.mkdir(parents=True, exist_ok=True)
+        jdk_system.download_jdk(jdk.get_download_url(java_version, vendor='Azul'), str(java_dir))
+
+        # 获取下载的JDK中的java.exe路径
+        java_path = next(java_dir.glob('*')) / 'bin' / 'java.exe'
 
     natives_dir = os.path.join(versions_dir, version_choice, version_choice + "-natives")
     with concurrent.futures.ThreadPoolExecutor():
@@ -112,6 +114,7 @@ def main():
     if os.path.exists(players_file_path) and os.path.getsize(players_file_path) > 0:
         with open(players_file_path, "r") as f:
             players_json = json.load(f)
+            f.close()
 
     if username in players_json:
         uid = players_json[username]["uuid"].replace('-', '')
@@ -120,10 +123,12 @@ def main():
 
     with open(players_file_path, "w") as f:
         json.dump(players_json, f, indent=4)
+        f.close()
 
     # Launch game
     with open(version_json_path, "r") as f:
         version_json = json.load(f)
+        f.close()
 
     arguments_jvm = ""
     for i in version_json['arguments']['jvm']:
@@ -144,6 +149,7 @@ def main():
 
     with open("launcher.bat", "w+") as f:
         f.write(arguments)
+        f.close()
 
     game_thread = threading.Thread(target=launch_game, args=(arguments,))
     print("正在启动游戏......")
