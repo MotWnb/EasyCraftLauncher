@@ -4,16 +4,13 @@ import subprocess
 import logging
 import threading
 from pathlib import Path
-
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urlsplit
-
 import urllib3
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 logging.basicConfig(level=logging.INFO)
-
 
 
 # 创建并启动线程的函数
@@ -49,7 +46,6 @@ def find_java_exe_and_versions_in_all_drives(desired_version):
         thread.join()
 
     return results
-
 
 
 def download_range(url, start, end, filename):
