@@ -2,7 +2,6 @@ import threading
 import time
 import winreg
 import urllib3
-import requests
 from selenium import webdriver
 from selenium.webdriver.edge.service import Service as EdgeService
 from webdriver_manager.microsoft import EdgeChromiumDriverManager
@@ -10,48 +9,44 @@ from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.edge.options import Options
+import requests
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 def find_browser_reg_path(browser_name):
-    browser_path = None
-    if browser_name == 'Chrome':
-        key = r'Software\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe'
-    elif browser_name == 'Edge':
-        key = r'Software\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe'
-    else:
+    paths = {
+        'Chrome': r'Software\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe',
+        'Edge': r'Software\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe'
+    }
+    key = paths.get(browser_name)
+    if not key:
         return None
 
     try:
-        hkey = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key)
-        browser_path = winreg.QueryValue(hkey, None)
-        winreg.CloseKey(hkey)
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, key) as hkey:
+            return winreg.QueryValue(hkey, None)
     except WindowsError:
-        pass
-
-    return browser_path
+        return None
 
 
 def get_authorization_code():
     options = Options()
     options.add_argument("--no-proxy-server")
-    # 检测Microsoft Edge
-    edge_path = find_browser_reg_path('Edge')
-    chrome_path = find_browser_reg_path('Chrome')
-    if edge_path:
-        print(f"Microsoft Edge 已安装: {edge_path}")
-        driver = webdriver.Edge(service=EdgeService(EdgeChromiumDriverManager().install()), options=options)
+    browser_path = find_browser_reg_path('Edge') or find_browser_reg_path('Chrome')
+    if browser_path:
+        print(f"Browser found: {browser_path}")
+        driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options) \
+            if 'Chrome' in browser_path else \
+            webdriver.Edge(service=EdgeService(EdgeChromiumDriverManager().install()), options=options)
     else:
-        print(f"Google Chrome 已安装: {chrome_path}")
-        driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
+        raise Exception("Neither Chrome nor Edge found.")
 
     url = ("http://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?prompt=login&client_id=00000000402b5328"
            "&response_type=code&scope=service%3A%3Auser.auth.xboxlive.com%3A%3AMBI_SSL&redirect_uri=https:%2F%2Flogin"
            ".live.com%2Foauth20_desktop.srf")
     driver.get(url)
 
-    # 循环检查当前URL
     while True:
         current_url = driver.current_url
         if "https://login.live.com/oauth20_desktop.srf?code=" in current_url:
@@ -62,50 +57,31 @@ def get_authorization_code():
 
 
 def ms_login_step2(code, is_refresh=False):
-    print("开始微软登录步骤 2(刷新登录)" if is_refresh else "开始微软登录步骤 2(非刷新登录)")
-
     url = "https://login.live.com/oauth20_token.srf"
-    headers = {
-        "Content-Type": "application/x-www-form-urlencoded"
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
+    payload = {
+        "client_id": "00000000402b5328",
+        "redirect_uri": "https://login.live.com/oauth20_desktop.srf",
+        "scope": "service::user.auth.xboxlive.com::MBI_SSL"
     }
-
+    payload["grant_type"] = "refresh_token" if is_refresh else "authorization_code"
     if is_refresh:
-        payload = {
-            "client_id": "00000000402b5328",
-            "refresh_token": code,
-            "grant_type": "refresh_token",
-            "redirect_uri": "https://login.live.com/oauth20_desktop.srf",
-            "scope": "service::user.auth.xboxlive.com::MBI_SSL"
-        }
+        payload["refresh_token"] = code
     else:
-        payload = {
-            "client_id": "00000000402b5328",
-            "code": code,
-            "grant_type": "authorization_code",
-            "redirect_uri": "https://login.live.com/oauth20_desktop.srf",
-            "scope": "service::user.auth.xboxlive.com::MBI_SSL"
-        }
+        payload["code"] = code
 
-    try:
-        response = requests.post(url, headers=headers, data=payload, verify=False)
+    with requests.Session() as session:
+        response = session.post(url, headers=headers, data=payload, verify=False)
         response.raise_for_status()
         result_json = response.json()
-    except requests.exceptions.HTTPError as e:
-        print(e)
-
-    access_token = result_json.get("access_token")
-    refresh_token = result_json.get("refresh_token")
-    return access_token, refresh_token
+        access_token = result_json.get("access_token")
+        refresh_token = result_json.get("refresh_token")
+        return access_token, refresh_token
 
 
 def ms_login_step3(access_token):
-    print("开始微软登录步骤 3")
-
     url = "https://user.auth.xboxlive.com/user/authenticate"
-    headers = {
-        "Content-Type": "application/json"
-    }
-
+    headers = {"Content-Type": "application/json"}
     payload = {
         "Properties": {
             "AuthMethod": "RPS",
@@ -116,19 +92,17 @@ def ms_login_step3(access_token):
         "TokenType": "JWT"
     }
 
-    try:
-        response = requests.post(url, headers=headers, json=payload, verify=False)
+    with requests.Session() as session:
+        response = session.post(url, headers=headers, json=payload, verify=False)
         response.raise_for_status()
-        result_json = response.json()
-    except requests.exceptions.HTTPError as e:
-        raise
-
-    xbl_token = result_json.get("Token")
-    return xbl_token
+        return response.json().get("Token")
 
 
 def ms_login_step4(xbl_token):
-    print("开始微软登录步骤 4")
+    url = "https://xsts.auth.xboxlive.com/xsts/authorize"
+    headers = {
+        "Content-Type": "application/json"
+    }
 
     request_body = {
         "Properties": {
@@ -139,53 +113,27 @@ def ms_login_step4(xbl_token):
         "TokenType": "JWT"
     }
 
-    url = "https://xsts.auth.xboxlive.com/xsts/authorize"
-    headers = {
-        "Content-Type": "application/json"
-    }
-
-    try:
-        response = requests.post(url, headers=headers, json=request_body, verify=False)
+    with requests.Session() as session:
+        response = session.post(url, headers=headers, json=request_body, verify=False)
         response.raise_for_status()
         result_json = response.json()
-    except requests.exceptions.HTTPError as e:
-        raise
-
-    xsts_token = result_json.get("Token")
-    uhs = result_json.get("DisplayClaims", {}).get("xui", [{}])[0].get("uhs")
-    return xsts_token, uhs
+        xsts_token = result_json.get("Token")
+        uhs = result_json.get("DisplayClaims", {}).get("xui", [{}])[0].get("uhs")
+        return xsts_token, uhs
 
 
 def ms_login_step5(tokens):
-    print("开始微软登录步骤 5")
-
+    url = "https://api.minecraftservices.com/authentication/login_with_xbox"
+    headers = {"Content-Type": "application/json"}
     identity_token = f"XBL3.0 x={tokens[1]};{tokens[0]}"
     request_body = {
         "identityToken": identity_token
     }
 
-    url = "https://api.minecraftservices.com/authentication/login_with_xbox"
-    headers = {
-        "Content-Type": "application/json"
-    }
-
-    try:
-        response = requests.post(url, headers=headers, json=request_body, verify=False)
+    with requests.Session() as session:
+        response = session.post(url, headers=headers, json=request_body, verify=False)
         response.raise_for_status()
-        result_json = response.json()
-    except requests.exceptions.HTTPError as e:
-        if e.response.status_code == 429:
-            print("微软登录第 5 步汇报 429")
-            raise Exception("登录尝试太过频繁，请等待几分钟后再试！")
-        elif e.response.status_code == 403:
-            print("微软登录第 5 步汇报 403")
-            raise Exception(
-                "当前 IP 的登录尝试异常。" + "\n" + "如果你使用了 VPN 或加速器，请把它们关掉或更换节点后再试！")
-        else:
-            raise
-
-    access_token = result_json.get("access_token")
-    return access_token
+        return response.json().get("access_token")
 
 
 def check_game_ownership(access_token):
@@ -195,40 +143,24 @@ def check_game_ownership(access_token):
         "Content-Type": "application/json"
     }
 
-    try:
-        response = requests.get(url, headers=headers, verify=False)
+    with requests.Session() as session:
+        response = session.get(url, headers=headers, verify=False)
         response.raise_for_status()
-        result_json = response.json()
-    except requests.exceptions.HTTPError as e:
-        print(f"HTTP error occurred: {e}")
-        return False
-
-    if "items" in result_json and result_json["items"]:
-        return True
-    else:
-        return False
+        return bool(response.json().get("items"))
 
 
 def ms_login_step7(access_token):
-    print("开始微软登录步骤 7")
-
     url = "https://api.minecraftservices.com/minecraft/profile"
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json"
     }
 
-    try:
-        response = requests.get(url, headers=headers, verify=False)
+    with requests.Session() as session:
+        response = session.get(url, headers=headers, verify=False)
         response.raise_for_status()
         result_json = response.json()
-    except requests.exceptions.HTTPError as e:
-        print(f"HTTP error occurred: {e}")
-        return None, None, None
-
-    uuid = result_json.get("id")
-    username = result_json.get("name")
-    return uuid, username, response.text
+        return result_json.get("id"), result_json.get("name"), response.text
 
 
 def perform_ms_login():
@@ -236,7 +168,7 @@ def perform_ms_login():
     try:
         with open("latest.log", "r") as f:
             refresh_token = f.read()
-    except Exception as e:
+    except Exception:
         pass
 
     if not refresh_token:
@@ -267,6 +199,5 @@ def perform_ms_login():
     else:
         print("获取玩家信息失败。")
     return uuid, username, access_token
-
 
 # perform_ms_login()

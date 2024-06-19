@@ -1,56 +1,57 @@
-from concurrent.futures import as_completed
-import concurrent.futures
 import os
 import json
+import platform
 import shutil
 import sys
-import zipfile
+
 import requests
-from requests.adapters import HTTPAdapter
-import urllib3
-import platform
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from zipfile import ZipFile
+
+# 定义常量
+CURRENT_DIR = os.getcwd()
+MINECRAFT_DIR = os.path.join(CURRENT_DIR, ".minecraft")
+LIBRARIES_DIR = os.path.join(MINECRAFT_DIR, "libraries")
+VERSIONS_DIR = os.path.join(MINECRAFT_DIR, "versions")
+ASSETS_DIR = os.path.join(MINECRAFT_DIR, "assets")
+INDEXES_DIR = os.path.join(ASSETS_DIR, "indexes")
+OBJECTS_DIR = os.path.join(ASSETS_DIR, "objects")
+
+# 配置请求会话
+session = requests.Session()
+adapter = requests.adapters.HTTPAdapter(max_retries=5, pool_maxsize=114514)
+session.mount('http://', adapter)
+session.mount('https://', adapter)
 
 
+# 定义下载函数
+def download_file(url, save_path):
+    response = session.get(url, stream=True)
+    response.raise_for_status()
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)  # 确保目录存在
+    with open(save_path, 'wb') as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            f.write(chunk)
+
+
+# 定义解压函数
+def extract_files(zip_path, extract_dir, arch):
+    with ZipFile(zip_path, 'r') as jar:
+        for info in jar.infolist():
+            if arch in info.filename and not info.filename.endswith('/'):
+                filename = os.path.basename(info.filename)
+                extract_path = os.path.join(extract_dir, filename)
+                if not os.path.exists(extract_dir):
+                    os.makedirs(extract_dir)
+                with jar.open(info) as source, open(extract_path, 'wb') as target:
+                    shutil.copyfileobj(source, target)
+
+
+# 主函数
 def download_minecraft_version():
-    futures = []
-    extracts = []
-    # 配置请求会话
-    adapter = HTTPAdapter(max_retries=5, pool_block=True, pool_maxsize=114514)
-    http = requests.Session()
-    http.mount('http://', adapter)
-    http.mount('https://', adapter)
-
-    # 定义工作目录
-    current_dir = os.getcwd()
-    minecraft_dir = os.path.join(current_dir, ".minecraft")
-    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-    def download_file(url_download, save_path_download):
-        response = http.get(url_download, stream=True, verify=False)
-        response.raise_for_status()
-        save_path_download = os.path.join(minecraft_dir, save_path_download)
-        os.makedirs(os.path.dirname(save_path_download), exist_ok=True)
-        with open(save_path_download, 'wb') as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                f.write(chunk)
-
-    def extract_files(save_path, natives_dir, arch):
-        try:
-            with zipfile.ZipFile(save_path, 'r') as jar:
-                for info in jar.infolist():
-                    if not info.filename.startswith('META-INF/') and arch in info.filename and not info.filename.endswith('/'):
-                        filename = os.path.basename(info.filename)
-                        extract_path = os.path.join(natives_dir, filename)
-                        if not os.path.exists(os.path.dirname(extract_path)):
-                            os.makedirs(os.path.dirname(extract_path))
-                        with jar.open(info) as source, open(extract_path, 'wb') as target:
-                            shutil.copyfileobj(source, target)
-        except Exception as e:
-            pass
-
     # 下载并读取版本清单文件
     version_manifest_url = "https://piston-meta.mojang.com/mc/game/version_manifest.json"
-    version_manifest_path = os.path.join(current_dir, "version_manifest.json")
+    version_manifest_path = os.path.join(CURRENT_DIR, "version_manifest.json")
     if not os.path.exists(version_manifest_path):
         download_file(version_manifest_url, version_manifest_path)
     with open(version_manifest_path, "r") as f:
@@ -63,7 +64,7 @@ def download_minecraft_version():
     for version in version_manifest["versions"]:
         if version["id"] == version_choice:
             version_json_url = version["url"]
-            version_json_path = os.path.join(minecraft_dir, "versions", version_choice, f"{version_choice}.json")
+            version_json_path = os.path.join(VERSIONS_DIR, version_choice, f"{version_choice}.json")
             if not os.path.exists(version_json_path):
                 download_file(version_json_url, version_json_path)
             with open(version_json_path, "r") as f:
@@ -71,51 +72,47 @@ def download_minecraft_version():
 
             # 下载客户端文件
             client_download = version_json["downloads"]["client"]
-            client_path = os.path.join(minecraft_dir, "versions", version_choice, f"{version_choice}.jar")
+            client_path = os.path.join(VERSIONS_DIR, version_choice, f"{version_choice}.jar")
             if not os.path.exists(client_path):
                 download_file(client_download["url"], client_path)
 
             # 下载依赖库文件
-            with concurrent.futures.ThreadPoolExecutor() as library_executor:
+            with ThreadPoolExecutor() as executor:
                 library_downloads = (
                     (library["downloads"]["artifact"]["url"], library["downloads"]["artifact"]["path"])
                     for library in version_json["libraries"]
                     if "downloads" in library
                 )
                 for url, path in library_downloads:
-                    save_path = os.path.join(minecraft_dir, "libraries", path)
+                    save_path = os.path.join(LIBRARIES_DIR, path)
                     if not os.path.exists(save_path):
-                        futures.append(library_executor.submit(download_file, url, save_path))
+                        executor.submit(download_file, url, save_path)
 
             # 下载资源文件清单
             asset_index = version_json["assetIndex"]
-            asset_index_path = os.path.join(minecraft_dir, "assets", "indexes", f"{asset_index['id']}.json")
+            asset_index_path = os.path.join(INDEXES_DIR, f"{asset_index['id']}.json")
             if not os.path.exists(asset_index_path):
                 download_file(asset_index["url"], asset_index_path)
             with open(asset_index_path, "r") as f:
                 asset_json = json.load(f)
 
             # 下载资源文件
-            with concurrent.futures.ThreadPoolExecutor() as asset_executor:
+            with ThreadPoolExecutor() as executor:
                 for asset, info in asset_json["objects"].items():
                     hash_assets = info["hash"]
                     url = f"https://resources.download.minecraft.net/{hash_assets[:2]}/{hash_assets}"
-                    save_path = os.path.join(minecraft_dir, "assets", "objects", hash_assets[:2], hash_assets)
+                    save_path = os.path.join(OBJECTS_DIR, hash_assets[:2], hash_assets)
                     if not os.path.exists(save_path):
-                        asset_executor.submit(download_file, url, save_path)
+                        executor.submit(download_file, url, save_path)
 
+            # 解压本地库文件
             systems = {'win32': 'windows', 'linux': 'linux', 'darwin': 'osx'}
             os_name = systems.get(sys.platform)
             arch = 'x64' if platform.machine().endswith('64') else 'x86'
-            for future in as_completed(futures):
-                pass
-            natives_dir = os.path.join(minecraft_dir, "versions", version_choice, version_choice + "-natives")
-            with concurrent.futures.ThreadPoolExecutor() as executor:
+            natives_dir = os.path.join(VERSIONS_DIR, version_choice, version_choice + "-natives")
+            with ThreadPoolExecutor() as executor:
                 for library in version_json["libraries"]:
                     if "rules" in library and any(
                             rule["action"] == "allow" and rule["os"]["name"] == os_name for rule in library["rules"]):
-                        save_path = os.path.join(current_dir, ".minecraft/libraries",
-                                                 library["downloads"]["artifact"]["path"])
-                        extracts.append(executor.submit(extract_files, save_path, natives_dir, arch))
-            for extract in as_completed(extracts):
-                pass
+                        save_path = os.path.join(LIBRARIES_DIR, library["downloads"]["artifact"]["path"])
+                        executor.submit(extract_files, save_path, natives_dir, arch)

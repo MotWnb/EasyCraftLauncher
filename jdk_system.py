@@ -1,44 +1,39 @@
+import logging
 import os
 import shutil
 import subprocess
-import logging
 import threading
-from pathlib import Path
-
-import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 from urllib.parse import urlsplit
 
-import urllib3
+import requests
 
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+# 设置日志级别
 logging.basicConfig(level=logging.INFO)
 
-
-
-# 创建并启动线程的函数
+# 定义查找Java执行文件的函数
 def find_java_exe_and_versions_in_all_drives(desired_version):
     results = {}
-    found = threading.Event()  # 事件对象用于通知线程停止
+    found = threading.Event()
 
     def scan_drive(drive):
-        for root, dirs, files in os.walk(drive):
-            if found.is_set():  # 如果事件被设置，则停止扫描
-                break
-            if 'java.exe' in files and '$' not in root:
-                java_exe_path = os.path.join(root, 'java.exe')
-                try:
-                    output = subprocess.check_output([java_exe_path, '-version'], stderr=subprocess.STDOUT, text=True)
-                    version_info = output.strip().split('\n')
-                    for line in version_info:
-                        if 'version' in line.lower():
-                            version = line.split()[2].replace('"', '').split('.')[0]
-                            if version == desired_version:
-                                results[java_exe_path] = version
-                                found.set()  # 设置事件，通知其他线程停止扫描
-                                break
-                except subprocess.CalledProcessError:
-                    pass  # 可以添加日志记录错误，但不要中断程序的执行
+        with os.scandir(drive) as it:
+            for entry in it:
+                if found.is_set():
+                    return
+                if entry.is_file() and entry.name == 'java.exe' and '$' not in entry.path:
+                    try:
+                        output = subprocess.run([entry.path, '-version'], capture_output=True, text=True, check=True)
+                        for line in output.stderr.split('\n'):
+                            if 'version' in line.lower():
+                                version = line.split()[2].replace('"', '')[0:2]  # 提取版本号的前两位
+                                if version == desired_version:
+                                    results[entry.path] = version
+                                    found.set()
+                                    break
+                    except subprocess.CalledProcessError as e:
+                        logging.error(f"Error running java.exe: {e}")
 
     drives = [f"{drive}:" for drive in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" if Path(f"{drive}:").exists()]
 
@@ -49,7 +44,6 @@ def find_java_exe_and_versions_in_all_drives(desired_version):
         thread.join()
 
     return results
-
 
 
 def download_range(url, start, end, filename):
