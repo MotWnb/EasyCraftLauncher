@@ -100,7 +100,7 @@ def download_minecraft_version():
             with ThreadPoolExecutor() as executor:
                 for asset, info in asset_json["objects"].items():
                     hash_assets = info["hash"]
-                    url = f"https://resources.download.minecraft.net/{hash_assets[:2]}/{hash_assets}"
+                    url = f"https://bmclapi2.bangbang93.com/assets/{hash_assets[:2]}/{hash_assets}"
                     save_path = os.path.join(OBJECTS_DIR, hash_assets[:2], hash_assets)
                     if not os.path.exists(save_path):
                         executor.submit(download_file, url, save_path)

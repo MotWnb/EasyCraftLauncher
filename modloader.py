@@ -8,7 +8,8 @@ import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 version = "1.20.4"
-latest_version_forge = requests.get(f"https://bmclapi2.bangbang93.com/forge/minecraft/{version}", verify=False).json()[-1]["build"]
+latest_version_forge = \
+requests.get(f"https://bmclapi2.bangbang93.com/forge/minecraft/{version}", verify=False).json()[-1]["build"]
 download_forge_url = f"https://bmclapi2.bangbang93.com/forge/download/{latest_version_forge}"
 
 # 获取最终的重定向URL和文件名
@@ -36,5 +37,5 @@ with open(filename, 'wb') as f:
 
 subprocess.run([
     "java", "-jar", filename,
-    "--installClient", "E:\ECL"
+    "--installClient", r"D:\EasyCraftLauncher_download\.minecraft"
 ], check=True)

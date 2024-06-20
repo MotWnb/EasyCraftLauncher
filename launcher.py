@@ -16,7 +16,8 @@ from requests.adapters import HTTPAdapter
 
 def launch_game(arguments):
     start_time = time.time()
-    process = subprocess.Popen(arguments, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE, text=True)
+    process = subprocess.Popen(arguments, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                               stdin=subprocess.PIPE, text=True)
 
     while True:
         try:
@@ -33,6 +34,7 @@ def launch_game(arguments):
         except Exception:
             pass
 
+
 def main():
     systems = {'win32': 'windows', 'linux': 'linux', 'darwin': 'osx'}
     os_name = systems.get(sys.platform)
@@ -47,6 +49,7 @@ def main():
     try:
         versions = os.listdir(versions_dir)
         version_choice = input(f"请输入需要启动的版本名称: {versions} ")
+        version_path = versions_dir / version_choice
         version_json_path = versions_dir / version_choice / f"{version_choice}.json"
         with open(version_json_path, "r") as f:
             version_json = json.load(f)
@@ -54,7 +57,7 @@ def main():
         print("错误代码：0，找不到版本文件")
         sys.exit(1)
     asset_index = version_json["assetIndex"]
-
+    mainclass = version_json["mainClass"]
     # Download JDK
     java_version = str(version_json["javaVersion"]["majorVersion"])
     java_exe_paths = jdk_system.find_java_exe_and_versions_in_all_drives(java_version)
@@ -110,37 +113,50 @@ def main():
     else:
         players_json[username] = {"uuid": uid}
 
-    with open(players_file_path, "w") as f:
-        json.dump(players_json, f, indent=4)
+    arguments_jvm = ""
+    for i in version_json['arguments']['jvm']:
+        if isinstance(i, str):
+            if '-' in i:
+                if '-cp' in i:
+                    arguments_jvm += "-cp ${classpath}\n"
+                else:
+                    arguments_jvm += i + "\n"
+    arguments_jvm = arguments_jvm.replace("${natives_directory}", str(natives_dir))
+    arguments_jvm = arguments_jvm.replace("${launcher_name}", "ECL")
+    arguments_jvm = arguments_jvm.replace("${launcher_version}", "1.0.0-PREVIEW")
+    arguments_jvm = arguments_jvm.replace("${classpath}", cp_str)
+    arguments_jvm = arguments_jvm.replace("\n", " ")
+    arguments_game = ""
 
-    # Launch game
-    with open(version_json_path, "r") as f:
-        version_json = json.load(f)
+    for i in version_json['arguments']['game']:
+        if isinstance(i, str):
+            arguments_game += i + " "
 
-        arguments_jvm = ""
-        for i in version_json['arguments']['jvm']:
-            if isinstance(i, str):
-                if '-' in i:
-                    if '-cp' in i:
-                        arguments_jvm += "-cp ${classpath}\n"
-                    else:
-                        arguments_jvm += i + "\n"
-        arguments_jvm = arguments_jvm.replace("${natives_directory}", str(natives_dir))
-        arguments_jvm = arguments_jvm.replace("${launcher_name}", "ECL")
-        arguments_jvm = arguments_jvm.replace("${launcher_version}", "1.0.0-PREVIEW")
-        arguments_jvm = arguments_jvm.replace("${classpath}", cp_str)
-        arguments_jvm = arguments_jvm.replace("\n", " ")
-        argument_game = f"net.minecraft.client.main.Main --username {username} --version {version_choice} --gameDir {minecraft_dir}\\{version_choice} --assetsDir {assets_dir} --assetIndex {asset_index['id']} --uuid {uid} --clientId 114514 --accessToken {access_token} --userType msa --versionType ECL"
-        arguments = arguments_jvm + argument_game
-        arguments = f'"{java_path}" {arguments}'
+    arguments_game = arguments_game.replace("${auth_player_name}", username)
+    arguments_game = arguments_game.replace("${version_name}", version_choice)
+    arguments_game = arguments_game.replace("${game_directory}", str(version_path))
+    arguments_game = arguments_game.replace("${assets_root}", str(assets_dir))
+    arguments_game = arguments_game.replace("${assets_index_name}", asset_index['id'])
+    arguments_game = arguments_game.replace("${auth_uuid}", uid)
+    arguments_game = arguments_game.replace("${auth_access_token}", access_token)
+    arguments_game = arguments_game.replace("${user_type}", "msa")
+    arguments_game = arguments_game.replace("${version_type}", "release")
+    arguments_game = arguments_game.replace("${natives_directory}", str(natives_dir))
+    arguments_game = arguments_game.replace("${classpath}", cp_str)
+    arguments_game = arguments_game.replace("${launcher_name}", "ECL")
+    arguments_game = arguments_game.replace("${launcher_version}", "1.0.0")
+    arguments_game = arguments_game.replace("${classpath}", cp_str)
 
-        with open("launcher.bat", "w+") as f:
-            f.write(arguments)
-            f.close()
+    argument_game = f"{mainclass} {arguments_game}"
+    arguments = arguments_jvm + argument_game
+    arguments = f'"{java_path}" {arguments}'
 
-        game_thread = threading.Thread(target=launch_game, args=(arguments,))
-        print("正在启动游戏......")
-        game_thread.start()
+    with open("launcher.bat", "w+") as f:
+        f.write(arguments)
+
+    game_thread = threading.Thread(target=launch_game, args=(arguments,))
+    print("正在启动游戏......")
+    game_thread.start()
 
     if __name__ == "__main__":
         main()
