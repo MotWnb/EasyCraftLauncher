@@ -4,24 +4,18 @@ import os
 
 
 def main():
-    choice = input("请输入你想要执行的项目(请输入对应的序号)\n"
-                   "1.下载版本与依赖\n"
-                   "2.启动游戏\n"
-                   "请选择:")
-    match int(choice):
-        case 1:
-            d()
-        case 2:
-            l()
-
-
-if __name__ == '__main__':
     ecl_folder = "ECL"
     init_name = "init.successfully"
     init_path = os.path.join(ecl_folder, init_name)
     if os.path.exists(init_path):
-        while True:
-            main()
+        choice = input("请输入你想要执行的项目(请输入对应的序号)\n"
+                       "1.下载版本与依赖\n"
+                       "2.启动游戏\n"
+                       "请选择:")
+        if choice == "1":
+            d()
+        elif choice == "2":
+            l()
     else:
         folder_path = os.getcwd()
         minecraft_folder = ".minecraft"
@@ -74,3 +68,8 @@ if __name__ == '__main__':
         '''新建init文件'''
         with open(init_path, "w") as f:
             f.write("")
+
+
+if __name__ == '__main__':
+    while True:
+        main()
