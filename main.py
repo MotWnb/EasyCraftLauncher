@@ -1,5 +1,6 @@
 from downloader import download_minecraft_version as d
 from launcher import main as l
+from settings import main_settings as s
 import os
 
 
@@ -11,11 +12,14 @@ def main():
         choice = input("请输入你想要执行的项目(请输入对应的序号)\n"
                        "1.下载版本与依赖\n"
                        "2.启动游戏\n"
+                       "3.设置\n"
                        "请选择:")
         if choice == "1":
             d()
         elif choice == "2":
             l()
+        elif choice == "3":
+            s()
     else:
         folder_path = os.getcwd()
         minecraft_folder = ".minecraft"

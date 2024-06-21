@@ -52,8 +52,7 @@ def main():
         with open(version_json_path, "r") as f:
             version_json = json.load(f)
     except FileNotFoundError:
-        print("错误代码：0，找不到版本文件")
-        sys.exit(1)
+        return
     asset_index = version_json["assetIndex"]
     mainclass = version_json["mainClass"]
     # Download JDK
