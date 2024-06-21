@@ -8,6 +8,7 @@ def main():
     ecl_folder = "ECL"
     init_name = "init.successfully"
     init_path = os.path.join(ecl_folder, init_name)
+    settings_path = os.path.join(ecl_folder, "settings.json")
     if os.path.exists(init_path):
         choice = input("请输入你想要执行的项目(请输入对应的序号)\n"
                        "1.下载版本与依赖\n"
@@ -67,11 +68,28 @@ def main():
                 "version": "1"
             }
         }
+
+        settings_json = {
+            "java_settings": {
+                "jre_list": [],
+                "jdk_list": [],
+                "java_list": []
+            },
+            "game_settings": {
+
+            },
+            "download_settings": {
+
+            }
+        }
+
         with open(launcher_profiles_path, "w") as f:
-            f.write(str(launcher_profiles))
+            f.write(str(launcher_profiles).replace("'", '"'))
         '''新建init文件'''
         with open(init_path, "w") as f:
             f.write("")
+        with open(settings_path, "w") as f:
+            f.write(str(settings_json).replace("'", '"'))
 
 
 if __name__ == '__main__':
