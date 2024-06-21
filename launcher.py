@@ -29,8 +29,6 @@ def launch_game(arguments):
             output = process.stdout.readline()
             if output == '' and process.poll() is not None:
                 break
-            if output:
-                print(output.strip())
         except Exception:
             pass
 

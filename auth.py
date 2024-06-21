@@ -189,7 +189,7 @@ def perform_ms_login():
     if check_game_ownership(access_token):
         print("用户拥有Minecraft游戏。")
     else:
-        print("用户没有Minecraft游戏。")
+        print("用户没有Minecraft游戏。请检查是否购买了Minecraft或设置Minecraft档案")
 
     uuid, username, result = ms_login_step7(access_token)  # 7
     if uuid and username:
