@@ -1,3 +1,5 @@
+import json
+
 from downloader import download_minecraft_version as d
 from launcher import main as l
 from settings import main_settings as s
@@ -6,22 +8,23 @@ import os
 
 def main():
     ecl_folder = "ECL"
-    init_name = "init.successfully"
+    init_name = "init"
     init_path = os.path.join(ecl_folder, init_name)
-    settings_path = os.path.join(ecl_folder, "settings.json")
     if os.path.exists(init_path):
-        choice = input("请输入你想要执行的项目(请输入对应的序号)\n"
-                       "1.下载版本与依赖\n"
-                       "2.启动游戏\n"
-                       "3.设置\n"
-                       "请选择:")
-        if choice == "1":
-            d()
-        elif choice == "2":
-            l()
-        elif choice == "3":
-            s()
+        while True:
+            choice = input("请输入你想要执行的项目(请输入对应的序号)\n"
+                           "1.下载版本与依赖\n"
+                           "2.启动游戏\n"
+                           "3.设置\n"
+                           "请选择:")
+            if choice == "1":
+                d()
+            elif choice == "2":
+                l()
+            elif choice == "3":
+                s()
     else:
+        settings_path = os.path.join(ecl_folder, "settings.json")
         folder_path = os.getcwd()
         minecraft_folder = ".minecraft"
         minecraft_folder = os.path.join(folder_path, minecraft_folder)
@@ -71,25 +74,23 @@ def main():
 
         settings_json = {
             "java_settings": {
-                "jre_list": [],
-                "jdk_list": [],
-                "java_list": []
-            },
-            "game_settings": {
-
+                "auto": True,
+                "java_choice": {}
             },
             "download_settings": {
-
+                "thread_count": 0,
+                "download_source": "official"
             }
         }
 
         with open(launcher_profiles_path, "w") as f:
-            f.write(str(launcher_profiles).replace("'", '"'))
+            json.dump(launcher_profiles, f, indent=4)
+        with open(settings_path, 'w') as f:
+            # 使用 json.dump() 将字典转换为 JSON 格式并写入文件
+            json.dump(settings_json, f, indent=4)
         '''新建init文件'''
         with open(init_path, "w") as f:
             f.write("")
-        with open(settings_path, "w") as f:
-            f.write(str(settings_json).replace("'", '"'))
 
 
 if __name__ == '__main__':
