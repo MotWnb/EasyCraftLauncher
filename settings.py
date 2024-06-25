@@ -11,9 +11,12 @@ def java_settings(settings):
         game_version = input("请输入需要设置的游戏版本(例如: 1.8.9)\n")
         for i in java_choice:
             if i == game_version:
-                i = settings[i]
+                i = java_choice[i]
                 print(f"版本 {game_version} 当前设置的java为 {i}")
-        java_path = input("请输入java路径(例如: E:\\java\\bin\\java.exe)\n")
+        java_path = input("请输入java路径,不需要双引号(例如: E:\\java\\bin\\java.exe)\n")
+        print(java_path)
+        java_path = '"' + java_path + '"'
+        print(java_path)
         java_choice[game_version] = java_path
     elif choice == "2":
         is_java_auto = True
@@ -25,6 +28,8 @@ def java_settings(settings):
         else:
             for i in java_choice:
                 print(f"版本 {i} 当前设置的java为: {java_choice[i]}")
+    elif choice == "4":
+        pass
     else:
         print("无效选项")
     java = {"auto": is_java_auto, "java_choice": java_choice}
@@ -34,18 +39,20 @@ def java_settings(settings):
 def download_settings(settings):
     thread_count = settings["download_settings"]["thread_count"]
     download_source = settings["download_settings"]["download_source"]
-    choice = input("请选择你需要的\n1.手动设置下载线程数而不是无限制\n2.设置使用的源(官方或BMCLAPI)\n3.退出\n")
+    choice = input("请选择你需要的\n1.设置使用的源(官方或BMCLAPI)\n2.退出\n")
+
     if choice == "1":
-        pass
+        print(f"当前的下载源为: {download_source}")
+        download_source = input("请输入你需要的下载源(official或bmclapi)\n")
 
     elif choice == "2":
         pass
-
-    elif choice == "3":
-        exit()
     else:
         print("无效选项")
-        download_settings(settings)
+
+    download = {"thread_count": thread_count, "download_source": download_source}
+
+    return download
 
 
 def main_settings():
@@ -67,7 +74,11 @@ def main_settings():
         settings_json.close()
         main_settings()
     elif choice == "2":
-        download_settings(settings)
+        set_download = download_settings(settings)
+        settings["download_settings"] = set_download
+        settings_json.seek(0)
+        settings_json.write(json.dumps(settings, indent=4))
+        settings_json.close()
         main_settings()
     elif choice == "3":
         pass

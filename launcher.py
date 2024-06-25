@@ -11,6 +11,7 @@ import requests
 import threading
 import time
 import auth
+import json
 from requests.adapters import HTTPAdapter
 
 
@@ -22,10 +23,10 @@ def launch_game(arguments):
     while True:
         try:
             current_time = time.time()
-            if current_time - start_time > 1:  # Increased to 5 minutes
+            if current_time - start_time > 10:
                 process.stdin.write("System.gc()\n")
                 process.stdin.flush()
-                start_time = current_time  # Reset the timer
+                start_time = current_time
             output = process.stdout.readline()
             if output == '' and process.poll() is not None:
                 break
@@ -39,7 +40,7 @@ def main():
     minecraft_dir = Path(".minecraft")
     versions_dir = minecraft_dir / "versions"
     assets_dir = minecraft_dir / "assets"
-
+    java_path = ""
     http = requests.Session()
     http.mount('http://', requests.adapters.HTTPAdapter(max_retries=5, pool_block=True))
     http.mount('https://', requests.adapters.HTTPAdapter(max_retries=5, pool_block=True))
@@ -57,18 +58,26 @@ def main():
     mainclass = version_json["mainClass"]
     # Download JDK
     java_version = str(version_json["javaVersion"]["majorVersion"])
-    java_exe_paths = jdk_system.find_java_exe_and_versions_in_all_drives(java_version)
+    with open("ECL\\settings.json", "r") as f:
+        settings = json.load(f)
+    if not settings["java_settings"]["auto"]:
+        for i in settings["java_settings"]["java_choice"]:
+            if i == version_choice:
+                java_path = settings["java_settings"]["java_choice"][i]
+                break
+    if java_path == "":
+        java_exe_paths = jdk_system.find_java_exe_and_versions_in_all_drives(java_version)
 
-    # Check for the existence of the specified version of Java
-    if java_exe_paths:
-        print(f"JDK{java_version} 已存在")
-        java_path = next(iter(java_exe_paths))  # Return the first found java.exe path
-    else:
-        # If it does not exist, download and set the Java environment
-        java_dir = Path.cwd() / "java" / f"jdk{java_version}"
-        java_dir.mkdir(parents=True, exist_ok=True)
-        jdk_system.download_jdk(jdk.get_download_url(java_version, vendor='Azul'), str(java_dir))
-        java_path = next(java_dir.glob('*')) / 'bin' / 'java.exe'
+        # Check for the existence of the specified version of Java
+        if java_exe_paths:
+            print(f"JDK{java_version} 已存在")
+            java_path = next(iter(java_exe_paths))  # Return the first found java.exe path
+        else:
+            # If it does not exist, download and set the Java environment
+            java_dir = Path.cwd() / "java" / f"jdk{java_version}"
+            java_dir.mkdir(parents=True, exist_ok=True)
+            jdk_system.download_jdk(jdk.get_download_url(java_version, vendor='Azul'), str(java_dir))
+            java_path = next(java_dir.glob('*')) / 'bin' / 'java.exe'
 
     natives_dir = versions_dir / version_choice / (version_choice + "-natives")
     with concurrent.futures.ThreadPoolExecutor() as executor:

@@ -72,10 +72,11 @@ def download_minecraft_version():
 
             # 下载客户端文件
             client_download = version_json["downloads"]["client"]
+            print(client_download["url"])
             client_path = os.path.join(VERSIONS_DIR, version_choice, f"{version_choice}.jar")
             if not os.path.exists(client_path):
                 download_file(client_download["url"], client_path)
-
+            print("开始下载依赖")
             # 下载依赖库文件
             with ThreadPoolExecutor() as executor:
                 library_downloads = (
@@ -95,7 +96,7 @@ def download_minecraft_version():
                 download_file(asset_index["url"], asset_index_path)
             with open(asset_index_path, "r") as f:
                 asset_json = json.load(f)
-
+            print("开始下载资源文件")
             # 下载资源文件
             with ThreadPoolExecutor() as executor:
                 for asset, info in asset_json["objects"].items():
