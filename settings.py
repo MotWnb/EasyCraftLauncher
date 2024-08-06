@@ -39,11 +39,18 @@ def java_settings(settings):
 def download_settings(settings):
     thread_count = settings["download_settings"]["thread_count"]
     download_source = settings["download_settings"]["download_source"]
-    choice = input("请选择你需要的\n1.设置使用的源(官方或BMCLAPI)\n2.退出\n")
+    choice = input("请选择你需要的选项\n1.设置使用的源(官方或BMCLAPI)\n2.退出\n")
 
     if choice == "1":
         print(f"当前的下载源为: {download_source}")
-        download_source = input("请输入你需要的下载源(official或bmclapi)\n")
+        download_source_choose = input("请输入你需要的下载源(official或bmclapi)\n1.official(官方源)\n2.bmclapi(镜像源)\n")
+        if download_source_choose == "1":
+            download_source = "official"
+        elif download_source_choose == "2":
+            download_source = "bmclapi"
+        else:
+            print("无效选项")
+
 
     elif choice == "2":
         pass
@@ -53,7 +60,6 @@ def download_settings(settings):
     download = {"thread_count": thread_count, "download_source": download_source}
 
     return download
-
 
 def main_settings():
     ecl_folder = "ECL"
@@ -69,6 +75,7 @@ def main_settings():
     if choice == "1":
         set_java = java_settings(java)
         settings["java_settings"] = set_java
+        settings_json.truncate(0)
         settings_json.seek(0)
         settings_json.write(json.dumps(settings, indent=4))
         settings_json.close()
@@ -76,6 +83,7 @@ def main_settings():
     elif choice == "2":
         set_download = download_settings(settings)
         settings["download_settings"] = set_download
+        settings_json.truncate(0)
         settings_json.seek(0)
         settings_json.write(json.dumps(settings, indent=4))
         settings_json.close()

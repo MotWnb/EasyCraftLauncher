@@ -12,11 +12,10 @@ def main():
     init_path = os.path.join(ecl_folder, init_name)
     if os.path.exists(init_path):
         while True:
-            choice = input("请输入你想要执行的项目(请输入对应的序号)\n"
+            choice = input("请输入你想要选项\n"
                            "1.下载版本与依赖\n"
                            "2.启动游戏\n"
-                           "3.设置\n"
-                           "请选择:")
+                           "3.设置\n")
             if choice == "1":
                 d()
             elif choice == "2":
