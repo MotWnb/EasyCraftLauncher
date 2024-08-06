@@ -77,7 +77,7 @@ def main():
                 "java_choice": {}
             },
             "download_settings": {
-                "thread_count": 0,
+                "thread_count": os.cpu_count() - 4 if os.cpu_count() - 4 > 0 else 1,
                 "download_source": "official"
             }
         }
