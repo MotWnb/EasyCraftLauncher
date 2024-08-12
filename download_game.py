@@ -16,12 +16,9 @@ async def download_file(session, url, save_path):
             with open(save_path, 'wb') as f:
                 f.write(data)
             return save_path
-    except aiohttp.ClientError as e:
-        print(f"下载失败: {url}")
-        return None
-    except Exception as e:
-        print(f"保存文件时出错: {e}")
-        return None
+    except Exception:
+        await download_file(session, url, save_path)
+        return save_path
 
 
 async def download_files(file_info_dict):
