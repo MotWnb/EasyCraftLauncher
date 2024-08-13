@@ -1,81 +1,78 @@
 import json
 import os
 import platform
+import sys
 import zipfile
 
 
 def get_system_type():
-    if os.name == 'nt':  # 检查是否为Windows系统
-        system_type = 'windows'
-    else:
-        # 对于非Windows系统，使用platform.system()
-        system_type = platform.system().lower()
+    return {
+        'nt': 'windows',
+        'posix': 'linux',
+        'java': 'osx'
+    }.get(os.name, 'unknown')
 
-    if system_type == 'linux':
+
+def get_system_arch_type():
+    os_name = platform.system().lower()
+    arch = platform.machine().lower()
+    is_64bits = sys.maxsize > 2 ** 32
+
+    if os_name == 'linux':
         return 'linux'
-    elif system_type == 'windows':
-        return 'windows'
-    elif system_type == 'darwin':
-        return 'osx'
+    elif os_name == 'darwin':
+        return 'macos-arm64.' if arch == 'arm' else 'macos.'
+    elif os_name == 'windows':
+        return {
+            'amd64': 'windows.',
+            'arm64': 'windows-arm64.',
+            'x86': 'windows-x86.',
+        }.get(arch, 'windows.')
     else:
         return 'unknown'
 
 
 def get_system_architecture():
+    is_64bits = sys.maxsize > 2 ** 32
     os_name = platform.system().lower()
 
-    if os_name == 'linux':
-        return 'linux.'
-    elif os_name == 'darwin':  # macOS
-        cpu_arch = platform.processor()
-        if cpu_arch == 'arm':
-            return 'macos-arm64.'
-        else:
-            return 'macos.'
-    elif os_name == 'windows':  # Windows
-        arch = platform.machine().lower()
-        if arch == 'amd64':
-            return 'windows.'
-        elif arch == 'arm64':
-            return 'windows-arm64.'
-        elif arch == 'x86':
-            return 'windows-x86.'
-        else:
-            return 'windows.'  # 默认返回 windows，以防其他未知架构
-    else:
-        return 'unknown'
+    if os_name == 'darwin':
+        return '64' if is_64bits else 'x86'
+
+    arch = platform.machine().lower()
+    if arch in ('amd64', 'x86_64', 'ia64'):
+        return '64'
+    elif arch in ('i386', 'i686'):
+        return 'x86'
+    elif arch == 'arm64':
+        return 'arm64'
+    elif arch.startswith('arm'):
+        return 'arm64' if is_64bits else 'x86'
+
+    return '64' if is_64bits else 'x86'
 
 
 def unzip_jar(jar_file_path, destination_folder):
-    # 确保目标目录存在，如果不存在，则创建它
     if not os.path.exists(destination_folder):
         os.makedirs(destination_folder)
 
     with zipfile.ZipFile(jar_file_path, 'r') as jar:
-        # 列出jar文件中的所有文件
-        list_of_files = jar.namelist()
-
-        # 过滤掉META-INF文件夹以及它里面的所有文件和所有目录
-        files_to_extract = [f for f in list_of_files if not f.startswith('META-INF/') and not f.endswith('/')]
-
-        # 提取文件到指定文件夹
+        files_to_extract = [f for f in jar.namelist() if not f.startswith('META-INF/') and not f.endswith('/')]
         for file_info in files_to_extract:
-            # 从jar文件中读取文件内容
             file_data = jar.read(file_info)
-
-            # 构建目标文件的完整路径
             destination_file_path = os.path.join(destination_folder, os.path.basename(file_info))
-
-            # 确保目标文件所在的目录存在
             os.makedirs(os.path.dirname(destination_file_path), exist_ok=True)
-
-            # 将文件写入到目标文件夹
             with open(destination_file_path, 'wb') as dest_file:
                 dest_file.write(file_data)
 
 
-# 定义一个函数，用于启动游戏
 def launcher_game(version_choice, minecraft_folder):
+    system_type = get_system_type()
+    system_arch_type = get_system_arch_type()
+    system_architecture = get_system_architecture()
+    classpath = []
+    jvm_arguments = ""
+    game_arguments = ""
     folder = os.getcwd()
     ecl_folder = os.path.join(folder, "ecl")
     temp_folder = os.path.join(ecl_folder, "temp")
@@ -87,16 +84,44 @@ def launcher_game(version_choice, minecraft_folder):
     libraries_folder = os.path.join(minecraft_folder, "libraries")
     version_json_file_path = os.path.join(version_folder, f"{version_choice}.json")
     version_jar_file_path = os.path.join(version_folder, f"{version_choice}.jar")
-    # 检测系统类型(linux/windows/osx)
-    sys_typ = get_system_type()
-    sys_arc = get_system_architecture()
+
     version_json = json.load(open(version_json_file_path, "r", encoding="utf-8"))
     for i in version_json["libraries"]:
-        if "rules" in i:
-            for f in i["rules"]:
-                if f["action"] == "allow":
-                    if sys_arc in i["downloads"]["artifact"]["path"]:
-                        library_file_path = os.path.join(libraries_folder,
-                                                         i["downloads"]["artifact"]["path"])
-                        unzip_jar(library_file_path, native_folder)
+        if "classifiers" in i["downloads"]:
+            for j in i["downloads"]["classifiers"]:
+                if j == f"natives-{system_type}":
+                    library_file_path = os.path.join(libraries_folder, i["downloads"]["classifiers"][j]["path"])
+                    classpath.append(library_file_path)
+                    unzip_jar(library_file_path, native_folder)
+        else:
+            library_file_path = os.path.join(libraries_folder, i["downloads"]["artifact"]["path"])
+            classpath.append(library_file_path)
+            if "rules" in i:
+                for f in i["rules"]:
+                    if f["action"] == "allow":
+                        if system_arch_type in i["downloads"]["artifact"]["path"]:
+                            unzip_jar(library_file_path, native_folder)
+    classpath.append(version_jar_file_path)
+    if "arguments" in version_json:
+        for i in version_json["arguments"]["jvm"]:
+            if "rules" in i:
+                if i["rules"][0]["action"] == "allow":
+                    if "arch" in i["rules"][0]["os"]:
+                        if i["rules"][0]["os"]["arch"] == system_architecture:
+                            jvm_arguments = jvm_arguments + " " + i["value"]
+                    if "name" in i["rules"][0]["os"]:
+                        if i["rules"][0]["os"]["name"] == system_type:
+                            jvm_arguments = jvm_arguments + " " + i["value"]
+            else:
+                jvm_arguments = jvm_arguments + " " + i
+        for i in version_json["arguments"]["game"]:
+            if isinstance(i, str):
+                game_arguments = game_arguments + " " + i
+        jvm_arguments = jvm_arguments.lstrip() + " "
+        game_arguments= game_arguments.lstrip()
 
+    if "minecraftArguments" in version_json:
+        game_arguments = version_json["minecraftArguments"]
+
+    print(jvm_arguments)
+    print(game_arguments)

@@ -14,7 +14,7 @@ async def download_file(session, url, save_path):
         async with session.get(url) as response:
             response.raise_for_status()
             data = await response.read()
-            with open(save_path, 'wb', encoding="utf-8") as f:
+            with open(save_path, 'wb') as f:
                 f.write(data)
             return save_path
     except Exception:
@@ -86,8 +86,15 @@ def download_game(choice, minecraft_folder):
         asset_save_path = os.path.join(assets_folder, "objects", asset_hash[:2], asset_hash)
         download_file_dict[asset_url] = asset_save_path
     for g in version_json["libraries"]:
-        library_url = g["downloads"]["artifact"]["url"]
-        library_save_path = os.path.join(libraries_folder,
-                                         g["downloads"]["artifact"]["path"])
-        download_file_dict[library_url] = library_save_path
+        if "artifact" in g["downloads"]:
+            library_url = g["downloads"]["artifact"]["url"]
+            library_save_path = os.path.join(libraries_folder,
+                                             g["downloads"]["artifact"]["path"])
+            download_file_dict[library_url] = library_save_path
+        if "classifiers" in g["downloads"]:
+            for h in g["downloads"]["classifiers"]:
+                library_url = g["downloads"]["classifiers"][h]["url"]
+                library_save_path = os.path.join(libraries_folder,
+                                                 g["downloads"]["classifiers"][h]["path"])
+                download_file_dict[library_url] = library_save_path
     asyncio.run(download_files(download_file_dict))
