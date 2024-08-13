@@ -1,9 +1,30 @@
 import json
 import os
 import platform
+import subprocess
 import sys
+import threading
+import time
 import zipfile
 
+
+def launch_game(arguments):
+    start_time = time.time()
+    process = subprocess.Popen(arguments, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                               stdin=subprocess.PIPE, text=True)
+
+    while True:
+        try:
+            current_time = time.time()
+            if current_time - start_time > 10:
+                process.stdin.write("System.gc()\n")
+                process.stdin.flush()
+                start_time = current_time
+            output = process.stdout.readline()
+            if output == '' and process.poll() is not None:
+                break
+        except Exception:
+            pass
 
 def get_system_type():
     return {
@@ -81,11 +102,13 @@ def launcher_game(version_choice, minecraft_folder):
     versions_folder = os.path.join(minecraft_folder, "versions")
     version_folder = os.path.join(versions_folder, version_choice)
     native_folder = os.path.join(version_folder, f"{version_choice}-natives")
+    assets_folder = os.path.join(minecraft_folder, "assets")
     libraries_folder = os.path.join(minecraft_folder, "libraries")
     version_json_file_path = os.path.join(version_folder, f"{version_choice}.json")
     version_jar_file_path = os.path.join(version_folder, f"{version_choice}.jar")
 
     version_json = json.load(open(version_json_file_path, "r", encoding="utf-8"))
+    assets_index_name = version_json["assetIndex"]["id"]
     for i in version_json["libraries"]:
         if "classifiers" in i["downloads"]:
             for j in i["downloads"]["classifiers"]:
@@ -121,7 +144,35 @@ def launcher_game(version_choice, minecraft_folder):
         game_arguments= game_arguments.lstrip()
 
     if "minecraftArguments" in version_json:
+        jvm_arguments = "-Djava.library.path=" + native_folder + " " + "-cp" + " " + ";".join(classpath) + " "
         game_arguments = version_json["minecraftArguments"]
+
+    jvm_arguments = jvm_arguments.replace("${natives_directory}", native_folder)
+    jvm_arguments = jvm_arguments.replace("${launcher_name}", "ECL")
+    jvm_arguments = jvm_arguments.replace("${classpath}", ";".join(classpath))
+    jvm_arguments = jvm_arguments.replace("${launcher_version}", "1.0.0-PREVIEW")
+
+    game_arguments = game_arguments.replace("${auth_player_name}", "XJ_gout")
+    game_arguments = game_arguments.replace("${version_name}", version_choice)
+    game_arguments = game_arguments.replace("${game_directory}", str(version_folder))
+    game_arguments = game_arguments.replace("${assets_root}", assets_folder)
+    game_arguments = game_arguments.replace("${assets_index_name}", assets_index_name)
+    game_arguments = game_arguments.replace("${auth_uuid}", "d2cfee2308ef4afe98f2308eaffa7d94")
+    game_arguments = game_arguments.replace("${auth_access_token}", "d2cfee2308ef4afe98f2308eaffa7d94")
+    game_arguments = game_arguments.replace("${user_type}", "msa")
+    game_arguments = game_arguments.replace("${version_type}", "release")
+    game_arguments = game_arguments.replace("${natives_directory}", str(native_folder))
+    game_arguments = game_arguments.replace("${launcher_name}", "ECL")
+    game_arguments = game_arguments.replace("${launcher_version}", "1.0.0")
+    game_arguments = game_arguments.replace("${user_properties}", "XJ_gout")
 
     print(jvm_arguments)
     print(game_arguments)
+
+    java_path = input("请输入Java路径:")
+
+    print(str(java_path + " " + jvm_arguments + " net.minecraft.client.main.Main " + game_arguments))
+    launch_game(str(java_path + " " + jvm_arguments + " net.minecraft.client.main.Main " + game_arguments))
+    # game_thread = threading.Thread(target=launch_game, args=(str(java_path + " " + jvm_arguments + " net.minecraft.client.main.Main " + game_arguments),))
+    print("正在启动游戏......")
+    # game_thread.start()
