@@ -1,5 +1,6 @@
 import os
 import download_game
+import launcher_game
 
 
 def main():
@@ -13,11 +14,12 @@ def main():
         if minecraft_folder == "1":
             minecraft_folder = input("请输入.minecraft文件夹的路径,将自动在此文件夹下创建.minecraft文件夹,如输入D:\\ECL:")
             minecraft_folder = minecraft_folder + "\\.minecraft"
-        if minecraft_folder == "2":
+        elif minecraft_folder == "2":
             minecraft_folder = os.getcwd() + "\\.minecraft"
-            os.mkdir(minecraft_folder)
         elif minecraft_folder == "3":
             minecraft_folder = os.path.expandvars("%APPDATA%\\.minecraft")
+        if not os.path.exists(minecraft_folder):
+            os.mkdir(minecraft_folder)
         with open("ECL/ecl.config", "w") as f:
             f.write(minecraft_folder)
         with open("ECL/ok", "w"):
@@ -25,10 +27,12 @@ def main():
     minecraft_folder = open("ECL/ecl.config", "r").read()
     user_choice = input("请输入你需要的选项\n1.下载游戏\n2.启动游戏")
     if user_choice == "1":
-        download_choice = input("请输入你需要的下载选项\n1.下载最新正式版本\n2.下载最新测试版本\n3.下载指定游戏版本")
+        download_choice = input("请输入你需要的下载选项\n1.下载指定游戏版本\n2.下载最新测试版本\n3.下载最新正式版本")
         download_game.download_game(download_choice, minecraft_folder)
     if user_choice == "2":
         start_choice = input("请输入你需要启动的游戏版本")
+        launcher_game.launcher_game(start_choice, minecraft_folder)
 
 
-main()
+if __name__ == "__main__":
+    main()

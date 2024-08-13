@@ -5,6 +5,7 @@ import os
 import aiohttp
 
 
+# 异步下载文件
 async def download_file(session, url, save_path):
     try:
         # 确保保存路径的目录存在
@@ -13,7 +14,7 @@ async def download_file(session, url, save_path):
         async with session.get(url) as response:
             response.raise_for_status()
             data = await response.read()
-            with open(save_path, 'wb') as f:
+            with open(save_path, 'wb', encoding="utf-8") as f:
                 f.write(data)
             return save_path
     except Exception:
@@ -21,15 +22,16 @@ async def download_file(session, url, save_path):
         return save_path
 
 
+# 异步下载文件列表
 async def download_files(file_info_dict):
     async with aiohttp.ClientSession() as session:
         tasks = [download_file(session, url, save_path) for url, save_path in file_info_dict.items()]
         for save_path in await asyncio.gather(*tasks):
             if save_path:
-                # 文件已保存，你可以在这里进行进一步处理
                 print(f"文件已保存到 {save_path}")
 
 
+# 下载游戏
 def download_game(choice, minecraft_folder):
     folder = os.getcwd()
     ecl_folder = os.path.join(folder, "ecl")
@@ -43,17 +45,17 @@ def download_game(choice, minecraft_folder):
     asyncio.run(download_files(
         {"https://piston-meta.mojang.com/mc/game/version_manifest.json": version_manifest_save_path}))
 
-    version_manifest = json.load(open(version_manifest_save_path, "r"))
+    version_manifest = json.load(open(version_manifest_save_path, "r", encoding="utf-8"))
     choice = int(choice)
     if choice == 1:
-        version_choice = version_manifest["latest"]["release"]
-        print(f"尝试下载最新版本: {version_choice}")
+        version_choice = input("请输入要下载的版本号: ")
+        print(f"尝试下载指定版本: {version_choice}")
     elif choice == 2:
         version_choice = version_manifest["latest"]["snapshot"]
         print(f"尝试下载最新快照版本: {version_choice}")
     elif choice == 3:
-        version_choice = input("请输入要下载的版本号: ")
-        print(f"尝试下载指定版本: {version_choice}")
+        version_choice = version_manifest["latest"]["release"]
+        print(f"尝试下载最新正式版本: {version_choice}")
     else:
         return "1"
 
@@ -69,14 +71,15 @@ def download_game(choice, minecraft_folder):
         return "2"
     print(version_info)
     asyncio.run(download_files({version_info: version_json_save_path}))  # 下载版本json
-    version_json = json.load(open(version_json_save_path, "r"))
+    version_json = json.load(open(version_json_save_path, "r", encoding="utf-8"))
     version_assets_index_url = version_json["assetIndex"]["url"]
     index_version = version_json["assetIndex"]["id"]
     asyncio.run(download_files({version_assets_index_url:
                                     os.path.join(assets_folder, "indexes", f"{index_version}.json")}))  # 下载版本json
     version_jar_url = version_json["downloads"]["client"]["url"]
     download_file_dict[version_jar_url] = version_jar_save_path
-    version_assets_index = json.load(open(os.path.join(assets_folder, "indexes", f"{index_version}.json"), "r"))
+    version_assets_index = json.load(open(os.path.join(assets_folder, "indexes", f"{index_version}.json")
+                                          , "r", encoding="utf-8"))
     for f in version_assets_index["objects"]:
         asset_hash = version_assets_index["objects"][f]["hash"]
         asset_url = f"https://resources.download.minecraft.net/{asset_hash[:2]}/{asset_hash}"
@@ -88,5 +91,3 @@ def download_game(choice, minecraft_folder):
                                          g["downloads"]["artifact"]["path"])
         download_file_dict[library_url] = library_save_path
     asyncio.run(download_files(download_file_dict))
-
-    # asyncio.run(download_files({version_json["downloads"]["client"]["url"]: version_jar_save_path}))  # 下载版本jar
