@@ -38,6 +38,9 @@ def main():
     if user_choice == "2":
         items = []
         path = os.path.join(minecraft_folder, "versions")
+        if not os.path.exists(path):
+            print("未找到.minecraft文件夹")
+            exit(1)
         for item in os.listdir(path):
             # 检查每个项是否是文件夹
             if os.path.isdir(os.path.join(path, item)):

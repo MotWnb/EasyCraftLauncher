@@ -34,8 +34,9 @@ def run_command_in_thread(script_path):
                 shell_cmd = ['bash', os.path.basename(path)]
                 os.chmod(path, 0o755)  # 设置执行权限
 
+            # 设置subprocess.Popen的encoding为utf-8，并使用'replace'来处理无效的字节
             with subprocess.Popen(shell_cmd, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                  text=True) as process:
+                                  text=True, encoding='utf-8', errors='replace') as process:
                 for line in process.stdout:
                     print(line, end='')
                 for line in process.stderr:
