@@ -4,27 +4,52 @@ import platform
 import subprocess
 import sys
 import threading
-import time
+import uuid
 import zipfile
 
 
-def launch_game(arguments):
-    start_time = time.time()
-    process = subprocess.Popen(arguments, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                               stdin=subprocess.PIPE, text=True)
+def generate_uuid_from_string(namespace, string):
+    return uuid.uuid5(namespace, string)
 
-    while True:
+
+def generate_script_file(script_content, script_name):
+    # 根据操作系统添加合适的文件扩展名
+    extension = '.bat' if get_system_type() == 'windows' else '.sh'
+    script_path = script_name + extension
+    with open(script_path, 'w') as file:
+        file.write(script_content)
+    return script_path
+
+
+def run_command_in_thread(script_path):
+    def thread_function(path):
         try:
-            current_time = time.time()
-            if current_time - start_time > 10:
-                process.stdin.write("System.gc()\n")
-                process.stdin.flush()
-                start_time = current_time
-            output = process.stdout.readline()
-            if output == '' and process.poll() is not None:
-                break
-        except Exception:
-            pass
+            # 在新线程中设置当前工作目录
+            original_cwd = os.getcwd()
+            os.chdir(os.path.dirname(path))  # 改变到脚本所在目录
+
+            if get_system_type() == 'windows':  # Windows
+                shell_cmd = ['cmd', '/c', os.path.basename(path)]
+            else:  # Unix/Linux/MacOS
+                shell_cmd = ['bash', os.path.basename(path)]
+                os.chmod(path, 0o755)  # 设置执行权限
+
+            with subprocess.Popen(shell_cmd, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                  text=True) as process:
+                for line in process.stdout:
+                    print(line, end='')
+                for line in process.stderr:
+                    print(line, end='')
+                process.wait()
+
+            # 恢复原始工作目录
+            os.chdir(original_cwd)
+        except Exception as e:
+            print(f"An error occurred: {e}")
+
+    thread = threading.Thread(target=thread_function, args=(script_path,))
+    thread.start()
+
 
 def get_system_type():
     return {
@@ -37,7 +62,6 @@ def get_system_type():
 def get_system_arch_type():
     os_name = platform.system().lower()
     arch = platform.machine().lower()
-    is_64bits = sys.maxsize > 2 ** 32
 
     if os_name == 'linux':
         return 'linux'
@@ -51,6 +75,26 @@ def get_system_arch_type():
         }.get(arch, 'windows.')
     else:
         return 'unknown'
+
+
+def determine_version_type(version_str):
+    version_parts = [int(part) for part in version_str.split('.')]
+
+    if len(version_parts) < 3:
+        return "Invalid version format"
+
+    last_two_parts = version_parts[-2:]
+
+    if last_two_parts[0] != 0 or last_two_parts[1] != 0:
+        return "preview"
+    else:
+        return "release"
+
+
+def replace_arguments(arguments, replacements):
+    for key, value in replacements.items():
+        arguments = arguments.replace(key, value)
+    return arguments
 
 
 def get_system_architecture():
@@ -87,7 +131,11 @@ def unzip_jar(jar_file_path, destination_folder):
                 dest_file.write(file_data)
 
 
-def launcher_game(version_choice, minecraft_folder):
+def launcher_game(version_choice):
+    config = json.load(open("ECL/ecl.config"))
+    minecraft_folder = config["minecraft_folder"]
+    ecl_version = config["ECL_version"]
+    ecl_type = determine_version_type(ecl_version)
     system_type = get_system_type()
     system_arch_type = get_system_arch_type()
     system_architecture = get_system_architecture()
@@ -97,11 +145,10 @@ def launcher_game(version_choice, minecraft_folder):
     folder = os.getcwd()
     ecl_folder = os.path.join(folder, "ecl")
     temp_folder = os.path.join(ecl_folder, "temp")
-    bat_file_path = os.path.join(temp_folder, "run.bat")
     version_choice = str(version_choice)
     versions_folder = os.path.join(minecraft_folder, "versions")
-    version_folder = os.path.join(versions_folder, version_choice)
-    native_folder = os.path.join(version_folder, f"{version_choice}-natives")
+    version_folder = str(os.path.join(versions_folder, version_choice))
+    native_folder = str(os.path.join(version_folder, f"{version_choice}-natives"))
     assets_folder = os.path.join(minecraft_folder, "assets")
     libraries_folder = os.path.join(minecraft_folder, "libraries")
     version_json_file_path = os.path.join(version_folder, f"{version_choice}.json")
@@ -141,38 +188,52 @@ def launcher_game(version_choice, minecraft_folder):
             if isinstance(i, str):
                 game_arguments = game_arguments + " " + i
         jvm_arguments = jvm_arguments.lstrip() + " "
-        game_arguments= game_arguments.lstrip()
+        game_arguments = game_arguments.lstrip()
 
     if "minecraftArguments" in version_json:
         jvm_arguments = "-Djava.library.path=" + native_folder + " " + "-cp" + " " + ";".join(classpath) + " "
         game_arguments = version_json["minecraftArguments"]
+    user_name = input("请输入用户名：")
+    namespace_uuid = uuid.UUID('12345678-1234-5678-1234-567812345678')
 
-    jvm_arguments = jvm_arguments.replace("${natives_directory}", native_folder)
-    jvm_arguments = jvm_arguments.replace("${launcher_name}", "ECL")
-    jvm_arguments = jvm_arguments.replace("${classpath}", ";".join(classpath))
-    jvm_arguments = jvm_arguments.replace("${launcher_version}", "1.0.0-PREVIEW")
+    # 生成UUID
+    user_uuid = str(generate_uuid_from_string(namespace_uuid, user_name)).replace('-', '')
+    classpath = ";".join(classpath)
+    # 定义替换字典
+    jvm_replacements = {
+        "${natives_directory}": native_folder,
+        "${launcher_name}": "ECL",
+        "${classpath}": classpath,
+        "${launcher_version}": ecl_version
+    }
 
-    game_arguments = game_arguments.replace("${auth_player_name}", "XJ_gout")
-    game_arguments = game_arguments.replace("${version_name}", version_choice)
-    game_arguments = game_arguments.replace("${game_directory}", str(version_folder))
-    game_arguments = game_arguments.replace("${assets_root}", assets_folder)
-    game_arguments = game_arguments.replace("${assets_index_name}", assets_index_name)
-    game_arguments = game_arguments.replace("${auth_uuid}", "d2cfee2308ef4afe98f2308eaffa7d94")
-    game_arguments = game_arguments.replace("${auth_access_token}", "d2cfee2308ef4afe98f2308eaffa7d94")
-    game_arguments = game_arguments.replace("${user_type}", "msa")
-    game_arguments = game_arguments.replace("${version_type}", "release")
-    game_arguments = game_arguments.replace("${natives_directory}", str(native_folder))
-    game_arguments = game_arguments.replace("${launcher_name}", "ECL")
-    game_arguments = game_arguments.replace("${launcher_version}", "1.0.0")
-    game_arguments = game_arguments.replace("${user_properties}", "XJ_gout")
+    game_replacements = {
+        "${auth_player_name}": user_name,
+        "${version_name}": version_choice,
+        "${game_directory}": version_folder,
+        "${assets_root}": assets_folder,
+        "${assets_index_name}": assets_index_name,
+        "${auth_uuid}": user_uuid,
+        "${auth_access_token}": user_uuid,
+        "${user_type}": "msa",
+        "${version_type}": ecl_type,
+        "${natives_directory}": native_folder,
+        "${launcher_name}": "ECL",
+        "${launcher_version}": ecl_version,
+        "${user_properties}": user_name
+    }
 
-    print(jvm_arguments)
-    print(game_arguments)
+    # 使用函数进行替换
+    jvm_arguments = replace_arguments(jvm_arguments, jvm_replacements)
+    game_arguments = replace_arguments(game_arguments, game_replacements)
 
     java_path = input("请输入Java路径:")
 
-    print(str(java_path + " " + jvm_arguments + " net.minecraft.client.main.Main " + game_arguments))
-    launch_game(str(java_path + " " + jvm_arguments + " net.minecraft.client.main.Main " + game_arguments))
-    # game_thread = threading.Thread(target=launch_game, args=(str(java_path + " " + jvm_arguments + " net.minecraft.client.main.Main " + game_arguments),))
+    command = java_path + " " + jvm_arguments + " net.minecraft.client.main.Main " + game_arguments
+    script_name = "run_game"
+    script_name = os.path.join(temp_folder, script_name)
+    script_path = generate_script_file(command, script_name)
+
+    # 在新线程中运行命令
+    run_command_in_thread(script_path)
     print("正在启动游戏......")
-    # game_thread.start()

@@ -32,7 +32,9 @@ async def download_files(file_info_dict):
 
 
 # 下载游戏
-def download_game(choice, minecraft_folder):
+def download_game(choice):
+    config = json.load(open("ECL/ecl.config"))
+    minecraft_folder = config["minecraft_folder"]
     folder = os.getcwd()
     ecl_folder = os.path.join(folder, "ecl")
     temp_folder = os.path.join(ecl_folder, "temp")
