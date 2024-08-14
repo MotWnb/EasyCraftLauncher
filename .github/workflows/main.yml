@@ -1,0 +1,72 @@
+name: Build Windows executable
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4.1.6
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v3
+      with:
+        python-version: 3.11
+
+    - name: Install dependencies
+      run: pip install -r requirements.txt
+
+    - name: Install PyInstaller
+      run: pip install pyinstaller
+
+    - name: Build executable
+      run: pyinstaller --onefile main.py
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: main.exe
+        path: dist/main.exe
+
+    # 创建一个新的标签
+    - name: Create tag
+      id: create_tag
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+        # 生成标签名，包含日期和时间（精确到秒）
+        $TAG_NAME = "v$(Get-Date -Format 'yyyy.MM.dd.HH.mm.ss')-build"
+        # 将标签名输出，以便后续步骤使用
+        echo "::set-output name=TAG_NAME::$TAG_NAME"
+        # 创建并推送标签
+        git tag -a $TAG_NAME -m "Build release$TAG_NAME"
+        git push origin $TAG_NAME
+      shell: powershell
+
+    # 创建一个新的发布
+    - name: Create release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.create_tag.outputs.TAG_NAME }}
+        release_name: "Release ${{ steps.create_tag.outputs.TAG_NAME }}"
+        draft: false
+        prerelease: false
+
+    # 上传构建的可执行文件到发布
+    - name: Upload release asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./dist/main.exe
+        asset_name: main.exe
+        asset_content_type: application/octet-stream
