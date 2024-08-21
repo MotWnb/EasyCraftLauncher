@@ -7,6 +7,8 @@ import threading
 import uuid
 import zipfile
 
+import auth
+
 
 def generate_uuid_from_string(namespace, string):
     return uuid.uuid5(namespace, string)
@@ -194,11 +196,18 @@ def launcher_game(version_choice):
     if "minecraftArguments" in version_json:
         jvm_arguments = "-Djava.library.path=" + native_folder + " " + "-cp" + " " + ";".join(classpath) + " "
         game_arguments = version_json["minecraftArguments"]
-    user_name = input("请输入用户名：")
-    namespace_uuid = uuid.UUID('12345678-1234-5678-1234-567812345678')
+    login_choice = input("请选择登录方式：1.离线登录 2.正版登录")
+    if login_choice == "1":
+        user_name = input("请输入用户名：")
+        namespace_uuid = uuid.UUID('12345678-1234-5678-1234-567812345678')
 
-    # 生成UUID
-    user_uuid = str(generate_uuid_from_string(namespace_uuid, user_name)).replace('-', '')
+        # 生成UUID
+        user_uuid = str(generate_uuid_from_string(namespace_uuid, user_name)).replace('-', '')
+        user_access_token = user_uuid
+    elif login_choice == "2":
+        user_uuid, user_name, user_access_token = auth.perform_ms_login()
+    else:
+        return 1
     classpath = ";".join(classpath)
     # 定义替换字典
     jvm_replacements = {
@@ -215,7 +224,7 @@ def launcher_game(version_choice):
         "${assets_root}": assets_folder,
         "${assets_index_name}": assets_index_name,
         "${auth_uuid}": user_uuid,
-        "${auth_access_token}": user_uuid,
+        "${auth_access_token}": user_access_token,
         "${user_type}": "msa",
         "${version_type}": ecl_type,
         "${natives_directory}": native_folder,

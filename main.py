@@ -39,15 +39,15 @@ def main():
         items = []
         path = os.path.join(minecraft_folder, "versions")
         if not os.path.exists(path):
-            print("未找到.minecraft文件夹")
-            exit(1)
-        for item in os.listdir(path):
-            # 检查每个项是否是文件夹
-            if os.path.isdir(os.path.join(path, item)):
-                items.append(item)
+            print("未找到.versions文件夹")
+        else:
+            for item in os.listdir(path):
+                # 检查每个项是否是文件夹
+                if os.path.isdir(os.path.join(path, item)):
+                    items.append(item)
 
-        start_choice = input("请输入你需要启动的游戏版本" + str(items))
-        launcher_game.launcher_game(start_choice)
+            start_choice = input("请输入你需要启动的游戏版本" + str(items))
+            launcher_game.launcher_game(start_choice)
 
 
 if __name__ == "__main__":
