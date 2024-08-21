@@ -1,49 +1,27 @@
 import os
-import platform
 
-def find_java_executable():
-    java_paths = []
+def search_all_java_exe(max_depth=3):
+    found_paths = []
 
-    # Windows 系统
-    if platform.system() == 'Windows':
-        # 获取系统环境变量中的路径
-        env_paths = os.environ.get('PATH', '').split(os.pathsep)
-        for path in env_paths:
-            if os.path.exists(os.path.join(path, 'java.exe')):
-                java_paths.append(os.path.join(path, 'java.exe'))
+    # 获取系统环境变量中的路径，并过滤掉空字符串
+    paths = [p for p in os.environ["PATH"].split(os.pathsep) if p]
 
-        drives = ['{}:\\'.format(d) for d in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' if os.path.exists('{}:\\'.format(d))]
-        for drive in drives:
-            for root, dirs, files in os.walk(drive):
-                if 'java.exe' in files:
-                    java_paths.append(os.path.join(root, 'java.exe'))
-                depth = root[len(drive):].count(os.sep)
-                if depth >= 3:
-                    break
-    # Linux 和 macOS 系统
-    else:
-        # 检查常见路径
-        common_paths = [
-            '/usr/bin',
-            '/usr/local/bin',
-            os.path.expanduser('~/bin')
-        ]
-        for path in common_paths:
-            if os.path.exists(os.path.join(path, 'java')):
-                java_paths.append(os.path.join(path, 'java'))
+    # 直接检查文件是否存在，而不是遍历整个目录
+    for path in paths:
+        java_exe_path = os.path.join(path, 'java.exe')
+        if os.path.isfile(java_exe_path):
+            found_paths.append(java_exe_path)
 
-        for root, dirs, files in os.walk('/'):
-            if 'java' in files:
-                java_paths.append(os.path.join(root, 'java'))
-            depth = root.count(os.sep)
-            if depth >= 3:
-                break
+    # 搜索每个盘符下的路径，限制搜索深度
+    drives = ['%s:\\' % d for d in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' if os.path.exists('%s:' % d)]
+    for drive in drives:
+        for root, dirs, files in os.walk(drive, topdown=True):
+            if 'java.exe' in files:
+                found_paths.append(os.path.join(root, 'java.exe'))
+            # 限制目录深度
+            if root.count(os.sep) - drive.count(os.sep) >= max_depth:
+                dirs[:] = []  # 不再深入搜索
 
-    return java_paths
+    return found_paths if found_paths else "No java.exe found in the system paths or drives within 3 levels."
 
-java_paths = find_java_executable()
-if java_paths:
-    for path in java_paths:
-        print(f"Java executable found at: {path}")
-else:
-    print("Java executable not found.")
+print(search_all_java_exe())
