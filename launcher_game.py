@@ -7,7 +7,10 @@ import threading
 import uuid
 import zipfile
 
+import jdk
+
 import auth
+import java_finder
 
 
 def generate_uuid_from_string(namespace, string):
@@ -237,7 +240,15 @@ def launcher_game(version_choice):
     jvm_arguments = replace_arguments(jvm_arguments, jvm_replacements)
     game_arguments = replace_arguments(game_arguments, game_replacements)
 
-    java_path = input("请输入Java路径:")
+    java_version = str(version_json["javaVersion"]["majorVersion"])
+    java_path = java_finder.main(java_version)
+    if java_path is None:
+        ecl_java = str(os.path.join(ecl_folder, "java", java_version))
+        if not os.path.exists(ecl_java):
+            os.makedirs(ecl_java, exist_ok=True)
+            jdk.install(java_version, path=ecl_java, vendor="Azul")
+        for i in os.listdir(ecl_java):
+            java_path = str(os.path.join(ecl_java, i, "bin", "java.exe"))
 
     command = java_path + " " + jvm_arguments + " net.minecraft.client.main.Main " + game_arguments
     script_name = "run_game"
