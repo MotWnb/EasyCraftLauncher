@@ -3,3 +3,4 @@ requests
 urllib3
 PyQt5
 PyQtWebEngine
+install-jdk
