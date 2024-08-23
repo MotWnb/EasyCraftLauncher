@@ -1,8 +1,8 @@
 import json
 import os
 
-import download_game
-import launcher_game
+from download_game import download_game
+from launcher_game import launcher_game
 
 
 def main():
@@ -34,7 +34,7 @@ def main():
     user_choice = input("请输入你需要的选项\n1.下载游戏\n2.启动游戏")
     if user_choice == "1":
         download_choice = input("请输入你需要的下载选项\n1.下载指定游戏版本\n2.下载最新测试版本\n3.下载最新正式版本")
-        download_game.download_game(download_choice)
+        download_game(download_choice)
     if user_choice == "2":
         items = []
         path = os.path.join(minecraft_folder, "versions")
@@ -47,7 +47,7 @@ def main():
                     items.append(item)
 
             start_choice = input("请输入你需要启动的游戏版本" + str(items))
-            launcher_game.launcher_game(start_choice)
+            launcher_game(start_choice)
 
 
 if __name__ == "__main__":

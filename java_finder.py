@@ -3,6 +3,7 @@ import re
 import subprocess
 import sys
 
+
 def find_java_executable_with_version(version):
     # 定义搜索路径
     search_paths = os.environ['PATH'].split(os.pathsep)
@@ -34,6 +35,7 @@ def find_java_executable_with_version(version):
                         return java_executable
     return None
 
+
 def get_java_major_version(java_executable):
     try:
         # 获取Java版本信息
@@ -57,6 +59,7 @@ def get_java_major_version(java_executable):
         pass
     return None
 
+
 def main(version):
     java_executable = find_java_executable_with_version(version)
     if java_executable:
@@ -64,6 +67,7 @@ def main(version):
     else:
         print(f"没有匹配的java {version}")
         return None
+
 
 if __name__ == '__main__':
     if len(sys.argv) > 1:

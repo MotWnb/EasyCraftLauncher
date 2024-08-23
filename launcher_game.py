@@ -11,6 +11,7 @@ import jdk
 
 import auth
 import java_finder
+from concurrent.futures import ThreadPoolExecutor
 
 
 def generate_uuid_from_string(namespace, string):
@@ -39,7 +40,7 @@ def run_command_in_thread(script_path):
                 shell_cmd = ['bash', os.path.basename(path)]
                 os.chmod(path, 0o755)  # 设置执行权限
 
-            # 设置subprocess.Popen的encoding为utf-8，并使用'replace'来处理无效的字节
+            # 设置subprocess.Popen的encoding为utf-8，并使用replace来处理无效的字节
             with subprocess.Popen(shell_cmd, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                   text=True, encoding='utf-8', errors='replace') as process:
                 for line in process.stdout:
@@ -91,7 +92,7 @@ def determine_version_type(version_str):
 
     last_two_parts = version_parts[-2:]
 
-    if last_two_parts[0] != 0 or last_two_parts[1] != 0:
+    if last_two_parts[0]!= 0 or last_two_parts[1]!= 0:
         return "preview"
     else:
         return "release"
@@ -137,17 +138,76 @@ def unzip_jar(jar_file_path, destination_folder):
                 dest_file.write(file_data)
 
 
+def login():
+    login_choice = input("请选择登录方式：1.离线登录 2.正版登录")
+    if login_choice == "1":
+        the_name = input("请输入用户名：")
+        namespace_uuid = uuid.UUID('12345678-1234-5678-1234-567812345678')
+
+        # 生成 UUID
+        the_uuid = str(generate_uuid_from_string(namespace_uuid, the_name)).replace('-', '')
+        the_access_token = the_uuid
+    elif login_choice == "2":
+        the_uuid, the_name, the_access_token = auth.perform_ms_login()
+    else:
+        return 1
+    return the_uuid, the_name, the_access_token
+
+
+def get_arg(v_json, lib_folder, native, version_jar):
+    s_type = get_system_type()
+    s_arch_type = get_system_arch_type()
+    s_architecture = get_system_architecture()
+    cp = []
+    jvm = ""
+    game = ""
+    for i in v_json["libraries"]:
+        if "classifiers" in i["downloads"]:
+            for j in i["downloads"]["classifiers"]:
+                if j == f"natives-{s_type}":
+                    library_file_path = os.path.join(lib_folder, i["downloads"]["classifiers"][j]["path"])
+                    cp.append(library_file_path)
+                    unzip_jar(library_file_path, native)
+        else:
+            library_file_path = os.path.join(lib_folder, i["downloads"]["artifact"]["path"])
+            cp.append(library_file_path)
+            if "rules" in i:
+                for f in i["rules"]:
+                    if f["action"] == "allow":
+                        if s_arch_type in i["downloads"]["artifact"]["path"]:
+                            unzip_jar(library_file_path, native)
+    cp.append(version_jar)
+    if "arguments" in v_json:
+        for i in v_json["arguments"]["jvm"]:
+            if "rules" in i:
+                if i["rules"][0]["action"] == "allow":
+                    if "arch" in i["rules"][0]["os"]:
+                        if i["rules"][0]["os"]["arch"] == s_architecture:
+                            jvm = jvm + " " + i["value"]
+                    if "name" in i["rules"][0]["os"]:
+                        if i["rules"][0]["os"]["name"] == s_type:
+                            jvm = jvm + " " + i["value"]
+            else:
+                jvm = jvm + " " + i
+        for i in v_json["arguments"]["game"]:
+            if isinstance(i, str):
+                game = game + " " + i
+        jvm = jvm.lstrip() + " "
+        game = game.lstrip()
+
+    if "minecraftArguments" in v_json:
+        jvm = '-Djava.library.path=' + native + " " + "-cp" + " " + ";".join(cp) + " "
+        game = v_json["minecraftArguments"]
+
+    cp = ";".join(cp)
+    return cp, jvm, game
+
+
 def launcher_game(version_choice):
     config = json.load(open("ECL/ecl.config"))
     minecraft_folder = config["minecraft_folder"]
     ecl_version = config["ECL_version"]
     ecl_type = determine_version_type(ecl_version)
-    system_type = get_system_type()
-    system_arch_type = get_system_arch_type()
-    system_architecture = get_system_architecture()
-    classpath = []
-    jvm_arguments = ""
-    game_arguments = ""
     folder = os.getcwd()
     ecl_folder = os.path.join(folder, "ecl")
     temp_folder = os.path.join(ecl_folder, "temp")
@@ -159,59 +219,21 @@ def launcher_game(version_choice):
     libraries_folder = os.path.join(minecraft_folder, "libraries")
     version_json_file_path = os.path.join(version_folder, f"{version_choice}.json")
     version_jar_file_path = os.path.join(version_folder, f"{version_choice}.jar")
-
     version_json = json.load(open(version_json_file_path, "r", encoding="utf-8"))
     assets_index_name = version_json["assetIndex"]["id"]
-    for i in version_json["libraries"]:
-        if "classifiers" in i["downloads"]:
-            for j in i["downloads"]["classifiers"]:
-                if j == f"natives-{system_type}":
-                    library_file_path = os.path.join(libraries_folder, i["downloads"]["classifiers"][j]["path"])
-                    classpath.append(library_file_path)
-                    unzip_jar(library_file_path, native_folder)
-        else:
-            library_file_path = os.path.join(libraries_folder, i["downloads"]["artifact"]["path"])
-            classpath.append(library_file_path)
-            if "rules" in i:
-                for f in i["rules"]:
-                    if f["action"] == "allow":
-                        if system_arch_type in i["downloads"]["artifact"]["path"]:
-                            unzip_jar(library_file_path, native_folder)
-    classpath.append(version_jar_file_path)
-    if "arguments" in version_json:
-        for i in version_json["arguments"]["jvm"]:
-            if "rules" in i:
-                if i["rules"][0]["action"] == "allow":
-                    if "arch" in i["rules"][0]["os"]:
-                        if i["rules"][0]["os"]["arch"] == system_architecture:
-                            jvm_arguments = jvm_arguments + " " + i["value"]
-                    if "name" in i["rules"][0]["os"]:
-                        if i["rules"][0]["os"]["name"] == system_type:
-                            jvm_arguments = jvm_arguments + " " + i["value"]
-            else:
-                jvm_arguments = jvm_arguments + " " + i
-        for i in version_json["arguments"]["game"]:
-            if isinstance(i, str):
-                game_arguments = game_arguments + " " + i
-        jvm_arguments = jvm_arguments.lstrip() + " "
-        game_arguments = game_arguments.lstrip()
 
-    if "minecraftArguments" in version_json:
-        jvm_arguments = "-Djava.library.path=" + native_folder + " " + "-cp" + " " + ";".join(classpath) + " "
-        game_arguments = version_json["minecraftArguments"]
-    login_choice = input("请选择登录方式：1.离线登录 2.正版登录")
-    if login_choice == "1":
-        user_name = input("请输入用户名：")
-        namespace_uuid = uuid.UUID('12345678-1234-5678-1234-567812345678')
+    # 使用线程池并行执行三个函数
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        login_future = executor.submit(login)
+        get_arg_future = executor.submit(get_arg, version_json, libraries_folder, native_folder, version_jar_file_path)
+        java_version = str(version_json["javaVersion"]["majorVersion"])
+        java_finder_future = executor.submit(java_finder.main, java_version)
 
-        # 生成UUID
-        user_uuid = str(generate_uuid_from_string(namespace_uuid, user_name)).replace('-', '')
-        user_access_token = user_uuid
-    elif login_choice == "2":
-        user_uuid, user_name, user_access_token = auth.perform_ms_login()
-    else:
-        return 1
-    classpath = ";".join(classpath)
+        # 获取三个函数的结果
+        user_name, user_uuid, user_access_token = login_future.result()
+        classpath, jvm_arguments, game_arguments = get_arg_future.result()
+        java_path = java_finder_future.result()
+
     # 定义替换字典
     jvm_replacements = {
         "${natives_directory}": native_folder,
@@ -240,8 +262,6 @@ def launcher_game(version_choice):
     jvm_arguments = replace_arguments(jvm_arguments, jvm_replacements)
     game_arguments = replace_arguments(game_arguments, game_replacements)
 
-    java_version = str(version_json["javaVersion"]["majorVersion"])
-    java_path = java_finder.main(java_version)
     if java_path is None:
         ecl_java = str(os.path.join(ecl_folder, "java", java_version))
         if not os.path.exists(ecl_java):
