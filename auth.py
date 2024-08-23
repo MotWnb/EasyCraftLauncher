@@ -8,6 +8,10 @@ from PyQt5.QtCore import QUrl, QTimer
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtWidgets import QApplication
 
+from printer import Printer
+
+printer = Printer()
+
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
@@ -61,6 +65,7 @@ def ms_login_step2(code, is_refresh=False):
     result_json = response.json()
     access_token = result_json.get("access_token")
     refresh_token = result_json.get("refresh_token")
+    printer.info("微软登录步骤 2")
     return access_token, refresh_token
 
 
@@ -78,6 +83,7 @@ def ms_login_step3(access_token):
     }
     response = requests.post(url, headers=headers, json=payload, verify=False)
     response.raise_for_status()
+    printer.info("微软登录步骤 3")
     return response.json().get("Token")
 
 
@@ -99,6 +105,7 @@ def ms_login_step4(xbl_token):
     result_json = response.json()
     xsts_token = result_json.get("Token")
     uhs = result_json.get("DisplayClaims", {}).get("xui", [{}])[0].get("uhs")
+    printer.info("微软登录步骤 4")
     return xsts_token, uhs
 
 
@@ -111,6 +118,7 @@ def ms_login_step5(tokens):
     }
     response = requests.post(url, headers=headers, json=request_body, verify=False)
     response.raise_for_status()
+    printer.info("微软登录步骤 5")
     return response.json().get("access_token")
 
 
@@ -134,6 +142,7 @@ def ms_login_step7(access_token):
     response = requests.get(url, headers=headers, verify=False)
     response.raise_for_status()
     result_json = response.json()
+    printer.info("微软登录步骤 7")
     return result_json.get("id"), result_json.get("name"), response.text
 
 
@@ -148,7 +157,7 @@ def perform_ms_login():
         user_names = [i for i in refresh_tokens]
         user_name = input("请输入你的用户名,如果你想要添加新账号，请输入 y " + str(user_names) + "\n")
     if not refresh_tokens or user_name == "y":
-        print("开始微软登录步骤 1：请在弹出的浏览器窗口中登录你的 Microsoft 账号")
+        printer.info("开始微软登录步骤 1：请在弹出的浏览器窗口中登录你的 Microsoft 账号")
         authorization_code = get_authorization_code()
         access_token, refresh_token = ms_login_step2(authorization_code)
     else:
@@ -158,14 +167,14 @@ def perform_ms_login():
     tokens = [xsts_token, uhs]
     access_token = ms_login_step5(tokens)
     if check_game_ownership(access_token):
-        print("用户拥有 Minecraft 游戏。")
+        printer.info("用户拥有 Minecraft 游戏。")
     else:
-        print("用户没有 Minecraft 游戏。")
+        printer.info("用户没有 Minecraft 游戏。")
     uuid, username, result = ms_login_step7(access_token)
     if uuid and username:
         pass
     else:
-        print("获取玩家信息失败。")
+        printer.warn("获取玩家信息失败。")
     refresh_tokens[username] = refresh_token
     with open("ECL/account.config", "w+") as f:
         json.dump(refresh_tokens, f, indent=4)

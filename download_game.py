@@ -4,6 +4,9 @@ import os
 
 import aiohttp
 
+from printer import Printer
+
+printer = Printer()
 
 # 异步下载文件
 async def download_file(session, url, save_path):
@@ -28,7 +31,7 @@ async def download_files(file_info_dict):
         tasks = [download_file(session, url, save_path) for url, save_path in file_info_dict.items()]
         for save_path in await asyncio.gather(*tasks):
             if save_path:
-                print(f"文件已保存到 {save_path}")
+                printer.info(f"文件已保存到 {save_path}")
 
 
 # 下载游戏
@@ -51,13 +54,13 @@ def download_game(choice):
     choice = int(choice)
     if choice == 1:
         version_choice = input("请输入要下载的版本号: ")
-        print(f"尝试下载指定版本: {version_choice}")
+        printer.info(f"尝试下载指定版本: {version_choice}")
     elif choice == 2:
         version_choice = version_manifest["latest"]["snapshot"]
-        print(f"尝试下载最新快照版本: {version_choice}")
+        printer.info(f"尝试下载最新快照版本: {version_choice}")
     elif choice == 3:
         version_choice = version_manifest["latest"]["release"]
-        print(f"尝试下载最新正式版本: {version_choice}")
+        printer.info(f"尝试下载最新正式版本: {version_choice}")
     else:
         return "1"
 
@@ -71,7 +74,7 @@ def download_game(choice):
             break
     if version_info == "":
         return "2"
-    print(version_info)
+    printer.info(version_info)
     asyncio.run(download_files({version_info: version_json_save_path}))  # 下载版本json
     version_json = json.load(open(version_json_save_path, "r", encoding="utf-8"))
     version_assets_index_url = version_json["assetIndex"]["url"]

@@ -11,6 +11,9 @@ import jdk
 
 import auth
 import java_finder
+from printer import Printer
+
+printer = Printer()
 
 
 def generate_uuid_from_string(namespace, string):
@@ -34,7 +37,7 @@ def run_command_in_thread(script_path):
             os.chdir(os.path.dirname(path))  # 改变到脚本所在目录
 
             if get_system_type() == 'windows':  # Windows
-                shell_cmd = ['cmd', '/c', os.path.basename(path)]
+                shell_cmd = ['cmd', '/c', 'start', '/b', os.path.basename(path)]
             else:  # Unix/Linux/MacOS
                 shell_cmd = ['bash', os.path.basename(path)]
                 os.chmod(path, 0o755)  # 设置执行权限
@@ -43,15 +46,15 @@ def run_command_in_thread(script_path):
             with subprocess.Popen(shell_cmd, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                   text=True, encoding='utf-8', errors='replace') as process:
                 for line in process.stdout:
-                    print(line, end='')
+                    printer.info(line, end='')
                 for line in process.stderr:
-                    print(line, end='')
+                    printer.error(line, end='')
                 process.wait()
 
             # 恢复原始工作目录
             os.chdir(original_cwd)
         except Exception as e:
-            print(f"An error occurred: {e}")
+            printer.error(f"An error occurred: {e}")
 
     thread = threading.Thread(target=thread_function, args=(script_path,))
     thread.start()
@@ -199,7 +202,7 @@ def launcher_game(version_choice):
     if "minecraftArguments" in version_json:
         jvm_arguments = "-Djava.library.path=" + native_folder + " " + "-cp" + " " + ";".join(classpath) + " "
         game_arguments = version_json["minecraftArguments"]
-    login_choice = input("请选择登录方式：1.离线登录 2.正版登录")
+    login_choice = input("请选择登录方式" + "\n" + "1.离线登录" + "\n" + "2.正版登录")
     if login_choice == "1":
         user_name = input("请输入用户名：")
         namespace_uuid = uuid.UUID('12345678-1234-5678-1234-567812345678')
@@ -257,4 +260,4 @@ def launcher_game(version_choice):
 
     # 在新线程中运行命令
     run_command_in_thread(script_path)
-    print("正在启动游戏......")
+    printer.info("正在启动游戏......")
