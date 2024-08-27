@@ -3,6 +3,9 @@ import re
 import subprocess
 import sys
 
+from printer import Printer
+
+printer = Printer()
 
 def find_java_executable_with_version(version):
     # 定义搜索路径
@@ -65,7 +68,7 @@ def main(version):
     if java_executable:
         return java_executable
     else:
-        print(f"没有匹配的java {version}")
+        printer.info(f"没有匹配的java {version}")
         return None
 
 
