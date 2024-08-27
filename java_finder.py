@@ -3,9 +3,12 @@ import re
 import subprocess
 import sys
 
+import jdk
+
 from printer import Printer
 
 printer = Printer()
+
 
 def find_java_executable_with_version(version):
     # 定义搜索路径
@@ -64,12 +67,20 @@ def get_java_major_version(java_executable):
 
 
 def main(version):
-    java_executable = find_java_executable_with_version(version)
-    if java_executable:
-        return java_executable
-    else:
-        printer.info(f"没有匹配的java {version}")
-        return None
+    java_executable = ""
+    ecl_folder = os.path.join(os.getcwd(), "ECL")
+    ecl_java = str(os.path.join(ecl_folder, "java", version))
+    if not os.path.exists(ecl_java):
+        java_executable = find_java_executable_with_version(version)
+        if java_executable:
+            return java_executable
+        else:
+            os.makedirs(ecl_java, exist_ok=True)
+            jdk.install(version, path=ecl_java, vendor="Azul")
+    for i in os.listdir(ecl_java):
+        java_executable = str(os.path.join(ecl_java, i, "bin", "java.exe"))
+    printer.info(f"已找到java{version}:{java_executable}")
+    return java_executable
 
 
 if __name__ == '__main__':

@@ -48,7 +48,7 @@ def main():
                 # 检查每个项是否是文件夹
                 if os.path.isdir(os.path.join(path, item)):
                     items.append(item)
-            start_choice = input("请输入你需要启动的游戏版本" + "\n" + "此为版本列表:" + "\n" + str(items))
+            start_choice = input("请输入你需要启动的游戏版本:\n" + str(items) + "\n")
             launcher_game.launcher_game(start_choice)
 
 
