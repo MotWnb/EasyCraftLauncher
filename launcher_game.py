@@ -35,7 +35,7 @@ def run_command_in_thread(script_path):
             original_cwd = os.getcwd()
             os.chdir(os.path.dirname(path))
             if get_system_type() == 'windows':
-                shell_cmd = ['cmd', '/c', os.path.basename(path)]
+                shell_cmd = ['cmd', '/c', 'start', '/b', os.path.basename(path)]
                 creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == 'win32' else 0
                 with subprocess.Popen(shell_cmd, shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                       text=True, encoding='utf-8', errors='replace', creationflags=creationflags) as process:
