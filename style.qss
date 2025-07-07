@@ -1,0 +1,65 @@
+/* 导航按钮样式 */
+QPushButton {
+    border: none;
+    padding: 8px 15px;
+    font-size: 14px;
+    color: #444444;
+    background-color: transparent;
+    border-radius: 4px;
+}
+
+QPushButton:hover {
+    background-color: #e8f0fe;
+    color: #0059c1;
+}
+
+QPushButton:checked {
+    border-bottom: 3px solid #0078d7;
+    color: #0078d7;
+    font-weight: bold;
+    background-color: transparent;
+}
+
+QPushButton:disabled {
+    color: #aaaaaa;
+}
+
+/* 进度条 */
+QProgressBar {
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    text-align: center;
+}
+
+QProgressBar::chunk {
+    background-color: #0078d7;
+    border-radius: 5px;
+}
+
+/* 普通按钮 */
+QPushButton {
+    min-height: 32px;
+    border-radius: 6px;
+}
+
+QPushButton:hover {
+    background-color: #d0e4ff;
+}
+
+QPushButton:pressed {
+    background-color: #a0c4ff;
+}
+
+/* 标签 */
+QLabel {
+    font-size: 14px;
+    color: #333333;
+}
+
+/* 文本编辑框 */
+QTextEdit {
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 6px;
+    font-size: 14px;
+}
