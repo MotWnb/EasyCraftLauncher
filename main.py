@@ -1,16 +1,25 @@
-import sys
 import asyncio
-from typing import Dict, List, TypedDict
+import os.path
+import sys
+import time
+from typing import List, Dict, Literal
 
+import aiofiles
+import aiohttp
+import qasync
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QApplication, QWidget, QPushButton, QLabel, QVBoxLayout, QHBoxLayout,
     QStackedWidget, QProgressBar, QTextEdit, QComboBox, QLineEdit, QFormLayout
 )
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QFont
 
-import aiohttp
-import qasync
+import TypedDict
+
+
+class VersionNotFoundError(Exception):
+    """当用户请求的 Minecraft 版本不存在时抛出"""
+    pass
 
 
 class HomePage(QWidget):
@@ -27,6 +36,49 @@ class HomePage(QWidget):
         layout.addStretch()
         layout.addWidget(label)
         layout.addStretch()
+
+
+class SmartDownloader:
+    def __init__(self, session: aiohttp.ClientSession):
+        self.session = session
+
+    async def download(self, url: str, target_path: str, retry: int = 3, timeout_per_chunk: float = 10.0):
+        existing_size = os.path.getsize(target_path) if os.path.exists(target_path) else 0
+        headers = {}
+        if existing_size > 0:
+            headers["Range"] = f"bytes={existing_size}-"
+
+        try:
+            async with self.session.get(url, headers=headers, allow_redirects=True) as resp:
+                if resp.status not in (200, 206):
+                    if retry > 0:
+                        return await self.download(url, target_path, retry - 1)
+                    else:
+                        raise Exception(f"下载失败：状态码 {resp.status}")
+
+                os.makedirs(os.path.dirname(target_path), exist_ok=True)
+                mode: Literal["ab", "wb"] = "ab" if existing_size > 0 else "wb"
+                start_time = time.time()
+                total_downloaded = 0
+
+                async with aiofiles.open(target_path, mode=mode) as f:
+                    while True:
+                        chunk = await asyncio.wait_for(resp.content.read(1024), timeout=timeout_per_chunk)
+                        if not chunk:
+                            break
+                        await f.write(chunk)  # 异步写入
+                        total_downloaded += len(chunk)
+
+                        elapsed = time.time() - start_time
+                        if elapsed > 5 and total_downloaded / elapsed < 1024:
+                            raise Exception("下载速度过慢，已自动中断并准备重试")
+
+        except Exception as e:
+            if retry > 0:
+                await asyncio.sleep(1)
+                return await self.download(url, target_path, retry - 1)
+            else:
+                raise Exception(f"下载失败：{e}")
 
 
 class DownloadPage(QWidget):
@@ -53,34 +105,28 @@ class DownloadPage(QWidget):
         layout.addWidget(self.download_btn)
 
         self._task = None
+        self.downloader = None
+
         # 用 QTimer 单次触发启动异步任务，利用 qasync 事件循环
         QTimer.singleShot(0, lambda: asyncio.create_task(self.get_versions()))
 
     async def initialize_session(self):
         self.session = aiohttp.ClientSession()
+        self.downloader = SmartDownloader(self.session)
 
-    async def get_versions(self):
+    async def get_versions(self) -> list[TypedDict.VersionInfo] | None:
         if self.session is None:
             await self.initialize_session()
         try:
             async with self.session.get(self.version_manifest_v2_url) as resp:
                 version_manifest: Dict = await resp.json()
-                self.versions: List = version_manifest.get("versions")
-
-                class VersionInfo(TypedDict):
-                    id: str
-                    type: str
-                    url: str
-                    time: str
-                    releaseTime: str
-                    sha1: str
-                    complianceLevel: int
-
+                self.versions: List[TypedDict.VersionInfo] = version_manifest.get("versions")
                 versions_list: List[str] = []
                 for version in self.versions:
-                    version_info: VersionInfo = version
-                    versions_list.append(version_info["id"])
+                    i_version_info: TypedDict.VersionInfo = version
+                    versions_list.append(i_version_info["id"])
                 self.version_combo.addItems(versions_list)
+                return self.versions
         except Exception as e:
             self.label.setText(f"获取版本列表失败: {e}")
 
@@ -91,13 +137,48 @@ class DownloadPage(QWidget):
             self._task = asyncio.create_task(self.download())
 
     async def download(self):
-        version = self.version_combo.currentText()
-        self.label.setText(f"正在下载版本 {version}...")
-        for i in range(1, 11):
-            await asyncio.sleep(0.3)  # 模拟下载进度
-            self.progress.setValue(i * 10)
-        self.label.setText(f"版本 {version} 下载完成！")
-        self.download_btn.setEnabled(True)
+        async def output(info: str):
+            self.label.setText(info)
+
+        try:
+            if self.session is None:
+                await self.initialize_session()
+            version: str = self.version_combo.currentText()
+            asyncio.create_task(output(f"开始下载版本 {version}..."))
+            versions = await self.get_versions()
+            selected_version_info = next((v for v in versions if v["id"] == version), None)
+            if selected_version_info is None:
+                raise VersionNotFoundError(f"找不到版本：{version}")
+
+            version_json_url = selected_version_info["url"]
+            asyncio.create_task(output(f"已找到版本 {version}，准备从 {version_json_url} 下载..."))
+
+            await self.downloader.download(version_json_url, f"{version}.json")
+
+            async with self.session.get(version_json_url) as version_json_resp:
+                asyncio.create_task(output(f"开始下载版本 {version} 核心json..."))
+                version_json = await version_json_resp.json()
+
+                # 版本jar
+                jar_url = version_json["downloads"]["client"]["url"]
+                jar_path = os.path.join(os.getcwd(), f"{version}.jar")
+
+                # asyncio.create_task(output(f"开始下载版本 {version} jar..."))
+                # await self.downloader.download(jar_url, jar_path)
+
+
+
+
+            asyncio.create_task(output(f"版本 {version} 下载完成！"))
+
+        except VersionNotFoundError as e:
+            asyncio.create_task(output(str(e)))
+            print(f"[Version Error] {e}")
+        except Exception as e:
+            asyncio.create_task(output("下载时发生未知错误"))
+            print(f"[Download Error] {e}")
+        finally:
+            self.download_btn.setEnabled(True)
 
 
 class LaunchPage(QWidget):
@@ -228,8 +309,8 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     # 读取样式表文件
     try:
-        with open("style.qss", "r", encoding="utf-8") as f:
-            app.setStyleSheet(f.read())
+        with open("style.qss", "r", encoding="utf-8") as qss_f:
+            app.setStyleSheet(qss_f.read())
     except Exception:
         pass
 
