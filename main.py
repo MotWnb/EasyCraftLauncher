@@ -1,4 +1,6 @@
 import asyncio
+import hashlib
+import json
 import os.path
 import sys
 import time
@@ -9,10 +11,8 @@ import aiohttp
 import qasync
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QFont
-from PySide6.QtWidgets import (
-    QApplication, QWidget, QPushButton, QLabel, QVBoxLayout, QHBoxLayout,
-    QStackedWidget, QProgressBar, QTextEdit, QComboBox, QLineEdit, QFormLayout
-)
+from PySide6.QtWidgets import (QApplication, QWidget, QPushButton, QLabel, QVBoxLayout, QHBoxLayout, QStackedWidget,
+                               QProgressBar, QTextEdit, QComboBox, QLineEdit, QFormLayout)
 
 import TypedDict
 
@@ -42,7 +42,29 @@ class SmartDownloader:
     def __init__(self, session: aiohttp.ClientSession):
         self.session = session
 
-    async def download(self, url: str, target_path: str, retry: int = 3, timeout_per_chunk: float = 10.0):
+    @staticmethod
+    async def calculate_sha1(file_path: str) -> str:
+        """异步计算文件的SHA1哈希值"""
+        sha1 = hashlib.sha1()
+        async with aiofiles.open(file_path, 'rb') as f:
+            while True:
+                chunk = await f.read(64 * 1024)  # 64KB块大小
+                if not chunk:
+                    break
+                sha1.update(chunk)
+        return sha1.hexdigest()
+
+    async def download(self, url: str, target_path: str, retry: int = 3, timeout_per_chunk: float = 10.0,
+                       expected_sha1: TypedDict.Optional[str] = None):
+        # 检查文件是否存在且SHA1匹配
+        if os.path.exists(target_path) and expected_sha1:
+            actual_sha1 = await self.calculate_sha1(target_path)
+            if actual_sha1 == expected_sha1:
+                print(f"文件已存在且SHA1匹配: {target_path}")
+                return True
+            else:
+                print(f"文件存在但SHA1不匹配 ({actual_sha1} vs {expected_sha1})，重新下载")
+                os.remove(target_path)  # 删除不匹配的文件
         existing_size = os.path.getsize(target_path) if os.path.exists(target_path) else 0
         headers = {}
         if existing_size > 0:
@@ -73,10 +95,35 @@ class SmartDownloader:
                         if elapsed > 5 and total_downloaded / elapsed < 1024:
                             raise Exception("下载速度过慢，已自动中断并准备重试")
 
+            # 下载完成后验证SHA1
+            if expected_sha1:
+                actual_sha1 = await self.calculate_sha1(target_path)
+                if actual_sha1 != expected_sha1:
+                    # SHA1不匹配时删除文件并重试
+                    print(f"SHA1校验失败: 期望 {expected_sha1}, 实际 {actual_sha1}")
+                    if os.path.exists(target_path):
+                        os.remove(target_path)
+                    if retry > 0:
+                        print(f"SHA1校验失败，尝试重新下载（剩余重试次数: {retry})")
+                        return await self.download(url, target_path, retry - 1, timeout_per_chunk, expected_sha1)
+                    else:
+                        raise Exception(f"SHA1校验失败: 期望 {expected_sha1}, 实际 {actual_sha1}")
+                else:
+                    print(f"SHA1校验通过: {target_path}")
+            return True  # 下载成功
+
         except Exception as e:
+
+            # 发生异常时删除可能损坏的文件
+            if os.path.exists(target_path):
+                try:
+                    os.remove(target_path)
+                except:
+                    pass
             if retry > 0:
+                print(f"下载出错: {e}, 尝试重新下载（剩余重试次数: {retry})")
                 await asyncio.sleep(1)
-                return await self.download(url, target_path, retry - 1)
+                return await self.download(url, target_path, retry - 1, timeout_per_chunk, expected_sha1)
             else:
                 raise Exception(f"下载失败：{e}")
 
@@ -150,26 +197,16 @@ class DownloadPage(QWidget):
             if selected_version_info is None:
                 raise VersionNotFoundError(f"找不到版本：{version}")
 
-            version_json_url = selected_version_info["url"]
-            asyncio.create_task(output(f"已找到版本 {version}，准备从 {version_json_url} 下载..."))
+            selected_version_json_url = selected_version_info["url"]
+            selected_version_json_sha1 = selected_version_info["sha1"]
+            asyncio.create_task(output(f"已找到版本 {version}，准备从 {selected_version_json_url} 下载..."))
 
-            await self.downloader.download(version_json_url, f"{version}.json")
+            await self.downloader.download(selected_version_json_url, f"{version}.json", selected_version_json_sha1)
 
-            async with self.session.get(version_json_url) as version_json_resp:
-                asyncio.create_task(output(f"开始下载版本 {version} 核心json..."))
-                version_json = await version_json_resp.json()
-
-                # 版本jar
-                jar_url = version_json["downloads"]["client"]["url"]
-                jar_path = os.path.join(os.getcwd(), f"{version}.jar")
-
-                # asyncio.create_task(output(f"开始下载版本 {version} jar..."))
-                # await self.downloader.download(jar_url, jar_path)
+            async with aiofiles.open(f"{version}.json", "r", encoding="utf-8") as f:
+                selected_version_json: TypedDict.VersionJsonInfo = json.loads(await f.read())
 
 
-
-
-            asyncio.create_task(output(f"版本 {version} 下载完成！"))
 
         except VersionNotFoundError as e:
             asyncio.create_task(output(str(e)))
@@ -233,12 +270,10 @@ class HelpPage(QWidget):
         layout = QVBoxLayout(self)
         self.text = QTextEdit()
         self.text.setReadOnly(True)
-        self.text.setText(
-            "帮助页面：\n\n"
-            "1. 选择版本下载最新的Minecraft客户端。\n"
-            "2. 在启动页面输入用户名并选择版本启动游戏。\n"
-            "3. 遇到问题可以查看这里的FAQ或联系我们。"
-        )
+        self.text.setText("帮助页面：\n\n"
+                          "1. 选择版本下载最新的Minecraft客户端。\n"
+                          "2. 在启动页面输入用户名并选择版本启动游戏。\n"
+                          "3. 遇到问题可以查看这里的FAQ或联系我们。")
         layout.addWidget(self.text)
 
 
